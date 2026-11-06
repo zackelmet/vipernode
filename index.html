@@ -528,11 +528,12 @@
   function easeOutQuad(t) { return 1 - (1 - t) * (1 - t); }
   function smoothstep(t) { return t * t * (3 - 2 * t); }
 
-  // ---------- blob / mountain / shatter shape system ----------
+  // ---------- blob / viper-head / shatter shape system ----------
   // 13 points, irregular spacing — an even point count with alternating
-  // high/low radii reads as an N-pointed star; breaking both the angular
-  // spacing and the amplitude pattern is what makes this read as a rock
-  // formation / mountain range instead.
+  // high/low radii reads as an N-pointed star no matter what it's "supposed"
+  // to be, so the jaggedness is deliberately directional and asymmetric
+  // instead (a thin neck on one side, a wide head mass on the other), which
+  // is also just what the brand's own emblem already looks like.
   var SHAPE_N = 13;
   var ANGLE_JITTER = [0, 0.09, -0.05, 0.12, -0.08, 0.04, -0.11, 0.07, -0.03, 0.10, -0.09, 0.05, -0.06];
   var SHAPE_ANGLES = [];
@@ -541,12 +542,11 @@
   }
   // lobsided: bulges hard over points 1-3, pinches over 7-8, smooth elsewhere
   var BLOB_R = [112, 138, 158, 160, 128, 100, 82, 62, 58, 68, 88, 102, 118];
-  // mountain range, not a star: one sharp isolated spike (idx1), one WIDE
-  // multi-point ridge (idx4-6) rather than a thin peak, a wide low valley
-  // (idx7-9), and a smaller secondary spike (idx10) — varying peak WIDTH
-  // and prominence is what reads as a rock formation; evenly-spaced
-  // same-width spikes is exactly what reads as an N-pointed star.
-  var MTN_R  = [95, 185, 80, 100, 158, 165, 140, 70, 60, 75, 150, 92, 110];
+  // abstract viper head: a thin neck (idx 0,1,10,11,12 — all small) opens
+  // into a head mass with one dominant snout spike (idx6) and two asymmetric
+  // jaw/hood flares (idx3, idx8) either side of it — directional, not radial,
+  // which is what keeps it from reading as a star or a mountain range.
+  var HEAD_R = [45, 42, 72, 140, 125, 158, 195, 112, 122, 66, 48, 55, 50];
 
   var mountainPath = document.getElementById('mountainPath');
   var mountainGrain = document.getElementById('mountainGrain');
@@ -579,13 +579,13 @@
     return d + 'Z';
   }
 
-  // Shatter fragments: fan-triangulated from the frozen mountain silhouette,
+  // Shatter fragments: fan-triangulated from the frozen head silhouette,
   // built once on first entry so each shard is a literal piece of that shape.
   var shards = [], shardsBuilt = false;
   function buildShards() {
     if (shardsBuilt) return;
     shardsBuilt = true;
-    var pts = shapePoints(MTN_R, 0, 0);
+    var pts = shapePoints(HEAD_R, 0, 0);
     for (var i = 0; i < SHAPE_N; i++) {
       var a = pts[i], b = pts[(i + 1) % SHAPE_N];
       var path = document.createElementNS(svgNS, 'path');
@@ -597,11 +597,11 @@
     }
   }
 
-  // scroll range [0, MORPH_END] owns the blob -> mountain -> shatter -> ring
-  // transition; the rest of the page (MORPH_END -> 1) drives the ring system
+  // scroll range [0, MORPH_END] owns the blob -> viper-head -> shatter ->
+  // ring transition; the rest of the page (MORPH_END -> 1) drives the ring
   var MORPH_END = 0.26;
   var A_END = 0.40;   // lobsided blob settles before it starts changing shape
-  var B_END = 0.72;   // fully-formed spiky mountain, right before it shatters
+  var B_END = 0.72;   // fully-formed viper head, right before it shatters
 
   var lastActive = -1, lastMode = '';
   function render(now) {
@@ -609,12 +609,18 @@
     if (Math.abs(target - cur) < 0.0005) cur = target;
 
     var morphT = remap(cur, 0, MORPH_END);
-    var shapeT = smoothstep(remap(morphT, A_END, B_END));   // 0 blob -> 1 mountain
+    var shapeT = smoothstep(remap(morphT, A_END, B_END));   // 0 blob -> 1 viper head
     var shatterT = remap(morphT, B_END, 1);
 
     if (shatterT <= 0) {
+      // scrolling back up out of the shatter phase: the shard fragments
+      // were only ever animated forward (shatterT > 0) and otherwise just
+      // freeze wherever they last were, so without this they sit there as
+      // a permanent ghost of the shattered shape on top of the reforming
+      // blob/head. Hide them outright whenever we're not actively shattering.
+      shardsG.style.opacity = 0;
       var radii = [];
-      for (var ri = 0; ri < SHAPE_N; ri++) radii.push(lerp(BLOB_R[ri], MTN_R[ri], shapeT));
+      for (var ri = 0; ri < SHAPE_N; ri++) radii.push(lerp(BLOB_R[ri], HEAD_R[ri], shapeT));
       var jitterAmp = reduce ? 0 : lerp(9, 2, shapeT);
       var pts = shapePoints(radii, jitterAmp, now);
       var dAttr = buildPath(pts, 1 - shapeT);
@@ -625,6 +631,7 @@
       blobShadowEl.style.opacity = 0.4;
     } else {
       buildShards();
+      shardsG.style.opacity = 1;
       mountainPath.style.opacity = Math.max(0, 1 - shatterT * 10);
       mountainGrain.style.opacity = Math.max(0, 1 - shatterT * 10) * 0.6;
       blobShadowEl.style.opacity = Math.max(0, 1 - shatterT * 6) * 0.4;
