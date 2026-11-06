@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ViperNode — runtime for autonomous security agents</title>
+<title>ViperNode: runtime for autonomous security agents</title>
 <meta name="description" content="ViperNode is the runtime infrastructure security teams run their agentic stacks on: per-action sandboxing, fleet orchestration, immutable audit, and bring-your-own-model. The ground your agents stand on — not another agent.">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -47,8 +47,8 @@
     --rule: #1d2026;
     --rule-soft: #15171c;
     --text: #eaeaec;
-    --dim: #8b8f99;
-    --faint: #52565f;
+    --dim: #aeb2bb;
+    --faint: #767a84;
     --accent: #e5484d;
     --accent-soft: rgba(229, 72, 77, 0.14);
     --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'IBM Plex Mono', Menlo, Consolas, monospace;
@@ -123,36 +123,13 @@
     will-change: transform, opacity;
   }
 
-  /* ---------- blob ---------- */
-  .blob-shadow {
-    position: absolute;
-    width: 200px; height: 46px;
-    background: radial-gradient(ellipse, rgba(0,0,0,0.55), transparent 72%);
-    filter: blur(6px);
-    transform: translateY(126px);
+  /* ---------- blob / mountain / shatter ---------- */
+  #blobShadow { fill: #000; opacity: 0.4; filter: blur(6px); }
+  #mountainPath {
+    fill: url(#blobGrad);
+    filter: drop-shadow(0 22px 34px rgba(229, 72, 77, 0.38));
   }
-  .blob {
-    position: relative;
-    width: 208px; height: 208px;
-    background:
-      radial-gradient(circle at 30% 24%, rgba(255,255,255,0.65), rgba(255,255,255,0) 32%),
-      radial-gradient(circle at 34% 30%, #ff8a8d 0%, #e5484d 38%, #96191e 74%, #2e0709 100%);
-    border-radius: 58% 42% 65% 35% / 45% 55% 45% 55%;
-    box-shadow:
-      0 35px 70px -18px rgba(229, 72, 77, 0.5),
-      inset -16px -20px 36px rgba(0,0,0,0.45),
-      inset 12px 14px 28px rgba(255,255,255,0.10);
-    animation: blobWobble 6.5s ease-in-out infinite alternate;
-  }
-  @keyframes blobWobble {
-    0%   { border-radius: 58% 42% 65% 35% / 45% 55% 45% 55%; }
-    33%  { border-radius: 44% 56% 40% 60% / 60% 38% 62% 40%; }
-    66%  { border-radius: 63% 37% 52% 48% / 38% 62% 36% 64%; }
-    100% { border-radius: 48% 52% 60% 40% / 55% 45% 58% 42%; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .blob { animation: none; }
-  }
+  .shard { fill: url(#blobGrad); transform-box: fill-box; transform-origin: center; }
 
   /* ---------- meta row ---------- */
   .meta-row {
@@ -409,8 +386,19 @@
       <div class="viz-sticky">
 
         <div class="viz-layer" id="blobLayer">
-          <div class="blob-shadow"></div>
-          <div class="blob"></div>
+          <svg class="viz-svg" viewBox="0 0 360 360" fill="none" id="blobSvg">
+            <defs>
+              <radialGradient id="blobGrad" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(130 115) scale(170)">
+                <stop offset="0%" stop-color="#ffb0b2"/>
+                <stop offset="32%" stop-color="#e5484d"/>
+                <stop offset="75%" stop-color="#8a1419"/>
+                <stop offset="100%" stop-color="#2e0709"/>
+              </radialGradient>
+            </defs>
+            <ellipse id="blobShadow" cx="180" cy="300" rx="92" ry="16"/>
+            <path id="mountainPath"/>
+            <g id="shards"></g>
+          </svg>
         </div>
 
         <div class="viz-layer" id="ringLayer">
@@ -521,12 +509,71 @@
   function pad(n, len) { n = String(n); while (n.length < len) n = '0' + n; return n; }
   function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
   function remap(v, a, b) { return clamp01((v - a) / (b - a)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
   function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
-  function easeInCubic(t) { return t * t * t; }
+  function easeOutQuad(t) { return 1 - (1 - t) * (1 - t); }
+  function smoothstep(t) { return t * t * (3 - 2 * t); }
 
-  // scroll range [0, MORPH_END] owns the blob -> ring transition;
-  // the rest of the page (MORPH_END -> 1) drives the ring system alone
-  var MORPH_END = 0.22;
+  // ---------- blob / mountain / shatter shape system ----------
+  var SHAPE_N = 10;
+  var SHAPE_ANGLES = [];
+  for (var sa = 0; sa < SHAPE_N; sa++) SHAPE_ANGLES.push((sa / SHAPE_N) * Math.PI * 2 - Math.PI / 2);
+  var BLOB_R = [128, 150, 118, 92, 64, 78, 96, 118, 100, 86];   // lobsided: one side bulges, other pinches
+  var MTN_R  = [150, 62, 158, 58, 142, 66, 152, 60, 146, 64];   // spiky: sharp alternating peaks/valleys
+
+  var mountainPath = document.getElementById('mountainPath');
+  var blobShadowEl = document.getElementById('blobShadow');
+  var shardsG = document.getElementById('shards');
+
+  function shapePoints(radii, jitterAmp, now) {
+    var pts = [];
+    for (var i = 0; i < SHAPE_N; i++) {
+      var j = jitterAmp ? Math.sin(now * 0.0011 + i * 2.1) * jitterAmp : 0;
+      var r = radii[i] + j;
+      pts.push({ x: 180 + Math.cos(SHAPE_ANGLES[i]) * r, y: 180 + Math.sin(SHAPE_ANGLES[i]) * r });
+    }
+    return pts;
+  }
+
+  // Closed Catmull-Rom -> cubic bezier, tension = roundness: 1 is a smooth
+  // organic curve through every point, 0 is a straight-edged polygon through
+  // those SAME points — lets blob and mountain share identical vertices.
+  function buildPath(pts, roundness) {
+    var n = pts.length;
+    var d = 'M ' + pts[0].x.toFixed(2) + ' ' + pts[0].y.toFixed(2) + ' ';
+    for (var i = 0; i < n; i++) {
+      var p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      var k = roundness / 6;
+      var c1x = p1.x + (p2.x - p0.x) * k, c1y = p1.y + (p2.y - p0.y) * k;
+      var c2x = p2.x - (p3.x - p1.x) * k, c2y = p2.y - (p3.y - p1.y) * k;
+      d += 'C ' + c1x.toFixed(2) + ' ' + c1y.toFixed(2) + ' ' + c2x.toFixed(2) + ' ' + c2y.toFixed(2) + ' ' + p2.x.toFixed(2) + ' ' + p2.y.toFixed(2) + ' ';
+    }
+    return d + 'Z';
+  }
+
+  // Shatter fragments: fan-triangulated from the frozen mountain silhouette,
+  // built once on first entry so each shard is a literal piece of that shape.
+  var shards = [], shardsBuilt = false;
+  function buildShards() {
+    if (shardsBuilt) return;
+    shardsBuilt = true;
+    var pts = shapePoints(MTN_R, 0, 0);
+    for (var i = 0; i < SHAPE_N; i++) {
+      var a = pts[i], b = pts[(i + 1) % SHAPE_N];
+      var path = document.createElementNS(svgNS, 'path');
+      path.setAttribute('class', 'shard');
+      path.setAttribute('d', 'M 180 180 L ' + a.x.toFixed(2) + ' ' + a.y.toFixed(2) + ' L ' + b.x.toFixed(2) + ' ' + b.y.toFixed(2) + ' Z');
+      shardsG.appendChild(path);
+      var midAng = Math.atan2((a.y + b.y) / 2 - 180, (a.x + b.x) / 2 - 180) + (Math.random() - 0.5) * 0.5;
+      shards.push({ el: path, angle: midAng, dist: 120 + Math.random() * 150, rot: (Math.random() - 0.5) * 3, delay: Math.random() * 0.25 });
+    }
+  }
+
+  // scroll range [0, MORPH_END] owns the blob -> mountain -> shatter -> ring
+  // transition; the rest of the page (MORPH_END -> 1) drives the ring system
+  var MORPH_END = 0.26;
+  var A_END = 0.40;   // lobsided blob settles before it starts changing shape
+  var B_END = 0.72;   // fully-formed spiky mountain, right before it shatters
 
   var lastActive = -1, lastMode = '';
   function render(now) {
@@ -534,25 +581,39 @@
     if (Math.abs(target - cur) < 0.0005) cur = target;
 
     var morphT = remap(cur, 0, MORPH_END);
-    // blob holds still for the first 45% of the morph window, then falls + shrinks + fades
-    var fallT = remap(morphT, 0.45, 1);
-    var fallEase = easeInCubic(fallT);
-    var blobOpacity = 1 - fallEase;
-    var blobY = fallEase * 150;
-    var blobScale = 1 - fallEase * 0.55;
+    var shapeT = smoothstep(remap(morphT, A_END, B_END));   // 0 blob -> 1 mountain
+    var shatterT = remap(morphT, B_END, 1);
 
-    // rings fade/scale in over the back half of the same window, so the two crossfade
-    var ringInT = remap(morphT, 0.5, 1);
-    var ringInEase = easeOutCubic(ringInT);
-    var ringOpacity = ringInEase;
-    var ringScale = 0.78 + ringInEase * 0.22;
+    if (shatterT <= 0) {
+      var radii = [];
+      for (var ri = 0; ri < SHAPE_N; ri++) radii.push(lerp(BLOB_R[ri], MTN_R[ri], shapeT));
+      var jitterAmp = reduce ? 0 : lerp(9, 2, shapeT);
+      var pts = shapePoints(radii, jitterAmp, now);
+      mountainPath.setAttribute('d', buildPath(pts, 1 - shapeT));
+      mountainPath.style.opacity = 1;
+      blobShadowEl.style.opacity = 0.4;
+    } else {
+      buildShards();
+      mountainPath.style.opacity = Math.max(0, 1 - shatterT * 10);
+      blobShadowEl.style.opacity = Math.max(0, 1 - shatterT * 6) * 0.4;
+      for (var si = 0; si < shards.length; si++) {
+        var s = shards[si];
+        var lt = remap(shatterT, s.delay, 1);
+        var eased = easeOutQuad(lt);
+        var dx = Math.cos(s.angle) * s.dist * eased;
+        var dy = Math.sin(s.angle) * s.dist * eased + eased * eased * 70;
+        var rot = s.rot * eased * 320;
+        s.el.setAttribute('transform', 'translate(' + dx.toFixed(1) + ' ' + dy.toFixed(1) + ') rotate(' + rot.toFixed(1) + ')');
+        s.el.style.opacity = 1 - eased;
+      }
+    }
 
-    blobLayer.style.opacity = blobOpacity;
-    blobLayer.style.transform = 'translateY(' + blobY.toFixed(1) + 'px) scale(' + blobScale.toFixed(3) + ')';
     blobLayer.style.pointerEvents = morphT >= 1 ? 'none' : '';
 
-    ringLayer.style.opacity = ringOpacity;
-    ringLayer.style.transform = 'scale(' + ringScale.toFixed(3) + ')';
+    // rings fade/scale in as the shatter clears, so the radar is what's left behind
+    var ringInEase = easeOutCubic(shatterT);
+    ringLayer.style.opacity = ringInEase;
+    ringLayer.style.transform = 'scale(' + (0.78 + ringInEase * 0.22).toFixed(3) + ')';
 
     // ring system's own internal progress only starts advancing once the morph has handed off
     var ringT = remap(cur, MORPH_END, 1);
