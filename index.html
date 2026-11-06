@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ViperNode — runtime for autonomous security agents</title>
 <meta name="description" content="ViperNode is the runtime infrastructure security teams run their agentic stacks on: per-action sandboxing, fleet orchestration, immutable audit, and bring-your-own-model. The ground your agents stand on — not another agent.">
-<link rel="icon" href="data:,">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" href="/fonts/Orbitron-Bold.woff2" as="font" type="font/woff2" crossorigin>
 <style>
   @font-face {
@@ -86,6 +88,7 @@
     padding: 16px 0;
   }
   .brand {
+    display: flex; align-items: center; gap: 10px;
     font-family: var(--display);
     font-weight: 800;
     font-size: 16px;
@@ -93,6 +96,7 @@
     text-transform: uppercase;
   }
   .brand .mark { color: var(--accent); }
+  .brand-mark { height: 20px; width: auto; display: block; }
   .masthead nav {
     display: flex; gap: 26px;
     font-size: 12px; color: var(--dim);
@@ -111,8 +115,43 @@
   .viz-sticky {
     position: sticky; top: 57px;
     height: calc(100vh - 57px);
-    display: flex; align-items: center; justify-content: center;
     overflow: hidden;
+  }
+  .viz-layer {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    will-change: transform, opacity;
+  }
+
+  /* ---------- blob ---------- */
+  .blob-shadow {
+    position: absolute;
+    width: 200px; height: 46px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.55), transparent 72%);
+    filter: blur(6px);
+    transform: translateY(126px);
+  }
+  .blob {
+    position: relative;
+    width: 208px; height: 208px;
+    background:
+      radial-gradient(circle at 30% 24%, rgba(255,255,255,0.65), rgba(255,255,255,0) 32%),
+      radial-gradient(circle at 34% 30%, #ff8a8d 0%, #e5484d 38%, #96191e 74%, #2e0709 100%);
+    border-radius: 58% 42% 65% 35% / 45% 55% 45% 55%;
+    box-shadow:
+      0 35px 70px -18px rgba(229, 72, 77, 0.5),
+      inset -16px -20px 36px rgba(0,0,0,0.45),
+      inset 12px 14px 28px rgba(255,255,255,0.10);
+    animation: blobWobble 6.5s ease-in-out infinite alternate;
+  }
+  @keyframes blobWobble {
+    0%   { border-radius: 58% 42% 65% 35% / 45% 55% 45% 55%; }
+    33%  { border-radius: 44% 56% 40% 60% / 60% 38% 62% 40%; }
+    66%  { border-radius: 63% 37% 52% 48% / 38% 62% 36% 64%; }
+    100% { border-radius: 48% 52% 60% 40% / 55% 45% 58% 42%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .blob { animation: none; }
   }
 
   /* ---------- meta row ---------- */
@@ -274,7 +313,7 @@
 
 <header>
   <div class="shell masthead">
-    <div class="brand">viper<span class="mark">/</span>node</div>
+    <div class="brand"><img class="brand-mark" src="/images/viper-mark.png" alt="" width="46" height="26">viper<span class="mark">/</span>node</div>
     <nav>
       <a href="#spec">specification</a>
       <a href="#interface">interface</a>
@@ -368,31 +407,39 @@
     <!-- ============ RIGHT: VIZ ============ -->
     <div class="col-viz" aria-hidden="true">
       <div class="viz-sticky">
-        <svg class="viz-svg" viewBox="0 0 360 360" fill="none" id="viz">
-          <defs>
-            <linearGradient id="sweepGrad" x1="180" y1="180" x2="340" y2="180" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stop-color="#e5484d" stop-opacity="0.9"/>
-              <stop offset="100%" stop-color="#e5484d" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <!-- spokes -->
-          <g id="spokes"></g>
-          <!-- rings + nodes injected by JS, grouped for independent rotation -->
-          <g id="r1" class="ringGroup"></g>
-          <g id="r2" class="ringGroup"></g>
-          <g id="r3" class="ringGroup"></g>
-          <g id="r4" class="ringGroup"></g>
-          <!-- radar sweep -->
-          <line id="sweep" class="sweep" x1="180" y1="180" x2="332" y2="180"/>
-          <!-- core -->
-          <circle class="node-core" cx="180" cy="180" r="3.5"/>
-          <circle cx="180" cy="180" r="9" fill="none" stroke="#e5484d" stroke-width="1" opacity="0.5"/>
-        </svg>
+
+        <div class="viz-layer" id="blobLayer">
+          <div class="blob-shadow"></div>
+          <div class="blob"></div>
+        </div>
+
+        <div class="viz-layer" id="ringLayer">
+          <svg class="viz-svg" viewBox="0 0 360 360" fill="none" id="viz">
+            <defs>
+              <linearGradient id="sweepGrad" x1="180" y1="180" x2="340" y2="180" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#e5484d" stop-opacity="0.9"/>
+                <stop offset="100%" stop-color="#e5484d" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- spokes -->
+            <g id="spokes"></g>
+            <!-- rings + nodes injected by JS, grouped for independent rotation -->
+            <g id="r1" class="ringGroup"></g>
+            <g id="r2" class="ringGroup"></g>
+            <g id="r3" class="ringGroup"></g>
+            <g id="r4" class="ringGroup"></g>
+            <!-- radar sweep -->
+            <line id="sweep" class="sweep" x1="180" y1="180" x2="332" y2="180"/>
+            <!-- core -->
+            <circle class="node-core" cx="180" cy="180" r="3.5"/>
+            <circle cx="180" cy="180" r="9" fill="none" stroke="#e5484d" stroke-width="1" opacity="0.5"/>
+          </svg>
+        </div>
 
         <div class="hud-top">VIPERNODE // RUNTIME</div>
         <div class="hud">
-          <div>RING SYNC <span class="d">·········</span> <span class="v" id="hud-pct">000%</span></div>
-          <div>NODES ACTIVE <span class="d">······</span> <span class="v" id="hud-nodes">00/22</span></div>
+          <div id="hud-line1">BLOB SYNC <span class="d">·······</span> <span class="v" id="hud-pct">000%</span></div>
+          <div id="hud-line2">NODES ACTIVE <span class="d">······</span> <span class="v" id="hud-nodes">00/22</span></div>
           <div>SECTION <span class="d">···········</span> <span class="v" id="hud-sec">—</span></div>
         </div>
       </div>
@@ -458,6 +505,10 @@
   var hudPct = document.getElementById('hud-pct');
   var hudNodes = document.getElementById('hud-nodes');
   var hudSec = document.getElementById('hud-sec');
+  var hudLine1 = document.getElementById('hud-line1');
+  var hudLine2 = document.getElementById('hud-line2');
+  var blobLayer = document.getElementById('blobLayer');
+  var ringLayer = document.getElementById('ringLayer');
 
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var target = 0, cur = 0;
@@ -468,14 +519,46 @@
   }
 
   function pad(n, len) { n = String(n); while (n.length < len) n = '0' + n; return n; }
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function remap(v, a, b) { return clamp01((v - a) / (b - a)); }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  function easeInCubic(t) { return t * t * t; }
 
-  var lastActive = -1;
+  // scroll range [0, MORPH_END] owns the blob -> ring transition;
+  // the rest of the page (MORPH_END -> 1) drives the ring system alone
+  var MORPH_END = 0.22;
+
+  var lastActive = -1, lastMode = '';
   function render(now) {
     cur += (target - cur) * 0.08;
     if (Math.abs(target - cur) < 0.0005) cur = target;
 
+    var morphT = remap(cur, 0, MORPH_END);
+    // blob holds still for the first 45% of the morph window, then falls + shrinks + fades
+    var fallT = remap(morphT, 0.45, 1);
+    var fallEase = easeInCubic(fallT);
+    var blobOpacity = 1 - fallEase;
+    var blobY = fallEase * 150;
+    var blobScale = 1 - fallEase * 0.55;
+
+    // rings fade/scale in over the back half of the same window, so the two crossfade
+    var ringInT = remap(morphT, 0.5, 1);
+    var ringInEase = easeOutCubic(ringInT);
+    var ringOpacity = ringInEase;
+    var ringScale = 0.78 + ringInEase * 0.22;
+
+    blobLayer.style.opacity = blobOpacity;
+    blobLayer.style.transform = 'translateY(' + blobY.toFixed(1) + 'px) scale(' + blobScale.toFixed(3) + ')';
+    blobLayer.style.pointerEvents = morphT >= 1 ? 'none' : '';
+
+    ringLayer.style.opacity = ringOpacity;
+    ringLayer.style.transform = 'scale(' + ringScale.toFixed(3) + ')';
+
+    // ring system's own internal progress only starts advancing once the morph has handed off
+    var ringT = remap(cur, MORPH_END, 1);
+
     var idle = reduce ? 0 : (now * 0.004);   // slow continuous drift
-    var base = cur * 540;                      // scroll is the primary driver
+    var base = ringT * 540;
 
     RINGS.forEach(function (ring) {
       var deg = base * ring.mult + idle * ring.mult;
@@ -485,10 +568,10 @@
 
     sweep.setAttribute('transform', 'rotate(' + (base * 1.6 + idle).toFixed(2) + ' ' + CX + ' ' + CY + ')');
 
-    // activate nodes up to progress
+    // activate nodes up to ring progress
     var active = 0;
     for (var i = 0; i < allNodes.length; i++) {
-      var on = cur >= allNodes[i].thresh;
+      var on = ringT >= allNodes[i].thresh;
       if (on) active++;
       var cls = allNodes[i].el.getAttribute('class');
       if (on && cls.indexOf('on') < 0) { allNodes[i].el.setAttribute('class', 'node on'); allNodes[i].el.setAttribute('r', '3.4'); }
@@ -499,7 +582,15 @@
       hudNodes.textContent = pad(active, 2) + '/' + total;
       lastActive = active;
     }
-    hudPct.textContent = pad(Math.round(cur * 100), 3) + '%';
+
+    var inBlobMode = morphT < 1;
+    var mode = inBlobMode ? 'blob' : 'ring';
+    if (mode !== lastMode) {
+      hudLine1.firstChild.textContent = inBlobMode ? 'BLOB SYNC ' : 'RING SYNC ';
+      hudLine2.style.opacity = inBlobMode ? '0.35' : '1';
+      lastMode = mode;
+    }
+    hudPct.textContent = pad(Math.round((inBlobMode ? morphT : ringT) * 100), 3) + '%';
 
     requestAnimationFrame(render);
   }
