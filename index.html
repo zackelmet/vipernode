@@ -521,12 +521,12 @@
   // window.__vizMorphT/__vizRevealT each frame so the two stay in lockstep
   // without duplicating the scroll-smoothing math. MORPH_END -> 1 drives the
   // ring system right here, completely unchanged from before.
-  // total-page-scroll budget: 30% blob, 30% cube cluster, 40% ring —
-  // MORPH_END is where blob+cube end and the ring takes over (0.60), and
-  // D_END (a fraction of the 0..1 morphT *within* that 0.60 window) is set
-  // so blob and cube each land on exactly half of it (30% / 30% of total).
-  var MORPH_END = 0.60;
-  var D_END = 0.94;   // 3D sequence fully resolved, right before the ring reveal
+  // total-page-scroll budget: 30% blob, 40% cube cluster, 30% ring —
+  // MORPH_END is where blob+cube end and the ring takes over (0.70), and
+  // D_END (a fraction of the 0..1 morphT *within* that 0.70 window) marks
+  // where the cube's long static hold ends and the ring starts revealing.
+  var MORPH_END = 0.70;
+  var D_END = 0.97;   // 3D sequence fully resolved, right before the ring reveal
 
   function render(now) {
     cur += (target - cur) * 0.08;
@@ -730,14 +730,18 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   }
 
   // ---------- scroll phases, all within window.__vizMorphT's 0..1 range ----------
-  // morphT spans MORPH_END (60%) of the total page scroll, so morphT=0.5 is
-  // exactly the 30%-of-page mark — blob gets [0, 0.5], cube gets [0.5, ~1].
-  var SETTLE_END   = 0.20;  // blob idles in open space, no frame yet
-  var BOXIN_END    = 0.42;  // frame fully drawn in, blob settled to fit inside it
-  // 0.42 -> 0.50: held beat, settled in the frame — this is the 30%-of-page mark
-  var FORM_START   = 0.50;  // blob -> cube-cluster crossfade begins
-  var FORM_END     = 0.86;  // cube-cluster fully formed, blob fully gone
-  // 0.86 -> D_END (classic script, 0.94): held beat, cube sits fully formed before the ring reveal
+  // morphT spans MORPH_END (70%) of the total page scroll. Target split is
+  // 30% blob / 40% cube / 30% ring of the WHOLE page, so morphT=0.43 is the
+  // 30%-of-page mark (blob's cutoff), and most of the cube's share is spent
+  // as a long static hold once it's formed — not a slower formation
+  // animation — since that reads as "more cube time" while scrolling past it.
+  var SETTLE_END   = 0.26;  // blob idles in open space, no frame yet
+  var BOXIN_END    = 0.40;  // frame fully drawn in, blob settled to fit inside it
+  // 0.40 -> 0.43: held beat, settled in the frame — this is the 30%-of-page mark
+  var FORM_START   = 0.43;  // blob -> cube-cluster crossfade begins
+  var FORM_END     = 0.60;  // cube-cluster fully formed, blob fully gone
+  // 0.60 -> D_END (classic script, 0.97): LONG held beat, cube sits fully
+  // formed and rotating for ~26% of total page scroll before the ring reveal
 
   var resizeObs = new ResizeObserver(function () { resize(); });
   resizeObs.observe(stage);
