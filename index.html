@@ -521,8 +521,12 @@
   // window.__vizMorphT/__vizRevealT each frame so the two stay in lockstep
   // without duplicating the scroll-smoothing math. MORPH_END -> 1 drives the
   // ring system right here, completely unchanged from before.
-  var MORPH_END = 0.42;   // more scroll space for the 3D sequence (was 0.26)
-  var D_END = 0.84;   // 3D sequence fully resolved, right before the ring reveal
+  // total-page-scroll budget: 30% blob, 30% cube cluster, 40% ring —
+  // MORPH_END is where blob+cube end and the ring takes over (0.60), and
+  // D_END (a fraction of the 0..1 morphT *within* that 0.60 window) is set
+  // so blob and cube each land on exactly half of it (30% / 30% of total).
+  var MORPH_END = 0.60;
+  var D_END = 0.94;   // 3D sequence fully resolved, right before the ring reveal
 
   function render(now) {
     cur += (target - cur) * 0.08;
@@ -726,14 +730,14 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   }
 
   // ---------- scroll phases, all within window.__vizMorphT's 0..1 range ----------
-  // each phase gets its own clearly separated chunk of scroll, with a held
-  // beat between transitions rather than one bleeding straight into the next
-  var SETTLE_END   = 0.24;  // blob idles in open space, no frame yet
+  // morphT spans MORPH_END (60%) of the total page scroll, so morphT=0.5 is
+  // exactly the 30%-of-page mark — blob gets [0, 0.5], cube gets [0.5, ~1].
+  var SETTLE_END   = 0.20;  // blob idles in open space, no frame yet
   var BOXIN_END    = 0.42;  // frame fully drawn in, blob settled to fit inside it
-  // 0.42 -> 0.50: held beat, settled in the frame, nothing changing
+  // 0.42 -> 0.50: held beat, settled in the frame — this is the 30%-of-page mark
   var FORM_START   = 0.50;  // blob -> cube-cluster crossfade begins
-  var FORM_END     = 0.74;  // cube-cluster fully formed, blob fully gone
-  // 0.74 -> D_END (classic script): held beat, cube sits fully formed before the ring reveal
+  var FORM_END     = 0.86;  // cube-cluster fully formed, blob fully gone
+  // 0.86 -> D_END (classic script, 0.94): held beat, cube sits fully formed before the ring reveal
 
   var resizeObs = new ResizeObserver(function () { resize(); });
   resizeObs.observe(stage);
