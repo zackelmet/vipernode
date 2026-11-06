@@ -3,421 +3,386 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ViperNode — Infrastructure for agentic cyber operations</title>
-<meta name="description" content="ViperNode is the infrastructure layer for running autonomous security agents in production: sandboxed execution, multi-agent orchestration, full audit logging, and bring-your-own-model flexibility.">
+<title>ViperNode — runtime for autonomous security agents</title>
+<meta name="description" content="ViperNode is the runtime infrastructure security teams run their agentic stacks on: per-action sandboxing, fleet orchestration, immutable audit, and bring-your-own-model. The ground your agents stand on — not another agent.">
 <link rel="icon" href="data:,">
 <style>
   :root {
-    --bg: #000000;
-    --line: #1a1a1a;
-    --line-soft: #141414;
-    --text: #e8e8e8;
-    --dim: #6e6e6e;
-    --faint: #3a3a3a;
-    --accent: #3ddc84;
-    --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Fira Code', Menlo, Consolas, monospace;
+    --paper: #f4f2ec;
+    --paper-raised: #faf9f5;
+    --ink: #1a1813;
+    --ink-soft: #57534a;
+    --ink-faint: #8f8a7e;
+    --rule: #d7d3c7;
+    --rule-soft: #e4e0d5;
+    --accent: #a31f17;
+    --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'IBM Plex Mono', Menlo, Consolas, monospace;
+    --serif: 'Hoefler Text', 'Iowan Old Style', Palatino, 'Palatino Linotype', Georgia, serif;
   }
 
   * { box-sizing: border-box; }
 
-  html, body {
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
     margin: 0;
-    padding: 0;
-    background: var(--bg);
-    color: var(--text);
+    background: var(--paper);
+    color: var(--ink);
     font-family: var(--mono);
-    font-size: 15px;
+    font-size: 14px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
 
-  a { color: inherit; text-decoration: none; }
+  ::selection { background: var(--accent); color: var(--paper); }
 
-  .wrap {
-    max-width: 760px;
+  a { color: var(--ink); text-decoration: none; }
+  a.link { color: var(--accent); text-underline-offset: 3px; }
+  a.link:hover { text-decoration: underline; }
+
+  .sheet {
+    max-width: 680px;
     margin: 0 auto;
-    padding: 0 24px;
+    padding: 0 28px;
   }
 
-  ::selection { background: var(--accent); color: #000; }
-
-  .cursor {
-    display: inline-block;
-    width: 8px;
-    height: 1em;
-    background: var(--accent);
-    vertical-align: text-bottom;
-    margin-left: 2px;
-    animation: blink 1s steps(1) infinite;
-  }
-
-  @keyframes blink { 50% { opacity: 0; } }
-
+  /* ---- masthead ---- */
   header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: rgba(0,0,0,0.85);
-    backdrop-filter: blur(6px);
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ink);
+    padding: 18px 0 16px;
   }
-
-  .nav {
+  .masthead {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
-    padding: 20px 0;
-    font-size: 13px;
+    gap: 16px;
   }
-
-  .wordmark {
-    font-weight: 600;
+  .brand {
+    font-weight: 700;
     letter-spacing: 0.02em;
-    color: var(--text);
-  }
-  .wordmark .us { color: var(--accent); }
-
-  .nav-links {
-    display: flex;
-    gap: 24px;
-    color: var(--dim);
-  }
-
-  .nav-links a::before { content: '['; color: var(--faint); }
-  .nav-links a::after  { content: ']'; color: var(--faint); }
-  .nav-links a:hover { color: var(--accent); }
-
-  main { padding-top: 8px; }
-
-  .comment { color: var(--faint); }
-  .str { color: var(--accent); }
-
-  section {
-    padding: 64px 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .hero { padding: 96px 0 72px; }
-
-  .eyebrow {
-    color: var(--dim);
-    font-size: 13px;
-    margin: 0 0 28px;
-  }
-
-  .hero h1 {
-    font-family: var(--sans, inherit);
-    font-size: clamp(30px, 5vw, 46px);
-    line-height: 1.22;
-    letter-spacing: -0.01em;
-    font-weight: 600;
-    margin: 0 0 24px;
-    color: var(--text);
-  }
-  .hero h1 .dim { color: var(--dim); }
-
-  .hero p.lede {
-    color: var(--dim);
     font-size: 15px;
-    line-height: 1.7;
+  }
+  .brand .mark { color: var(--accent); }
+  .masthead nav {
+    display: flex;
+    gap: 22px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-transform: lowercase;
+  }
+  .masthead nav a:hover { color: var(--accent); }
+
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  /* ---- lede ---- */
+  .lede { padding: 56px 0 44px; border-bottom: 1px solid var(--rule); }
+  .lede h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(32px, 5.4vw, 48px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 26px;
+  }
+  .lede h1 .q { color: var(--ink-faint); }
+  .lede .deck {
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--ink-soft);
     max-width: 520px;
-    margin: 0 0 40px;
+    margin: 0 0 30px;
   }
+  .lede .deck b { color: var(--ink); font-weight: 600; }
 
-  .hero p.lede code {
-    color: var(--text);
-    background: var(--line-soft);
-    padding: 1px 5px;
-    border-radius: 2px;
+  .builtfor {
+    font-size: 12px;
+    color: var(--ink-faint);
   }
+  .builtfor .k { color: var(--ink); }
+  .builtfor .dot { color: var(--accent); padding: 0 6px; }
 
-  .term {
-    border: 1px solid var(--line);
-    background: #050505;
-    border-radius: 4px;
-    overflow: hidden;
-  }
+  /* ---- sections ---- */
+  section { padding: 40px 0; border-bottom: 1px solid var(--rule); }
 
-  .term-bar {
+  .sec-label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--line);
-    color: var(--faint);
-    font-size: 12px;
+    gap: 12px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 26px;
+  }
+  .sec-label .num { color: var(--accent); font-weight: 600; }
+  .sec-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
   }
 
-  .term-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--faint);
-  }
-
-  .term-body {
-    padding: 20px 18px 24px;
-    font-size: 13.5px;
-    line-height: 1.9;
-    min-height: 170px;
-  }
-
-  .term-body .prompt { color: var(--faint); }
-  .term-body .out { color: var(--dim); }
-  .term-body .ok { color: var(--accent); }
-
-  .actions {
-    display: flex;
-    gap: 14px;
-    margin-top: 36px;
-    font-size: 13.5px;
-    flex-wrap: wrap;
-  }
-
-  .btn {
-    padding: 11px 18px;
-    border: 1px solid var(--line);
-    border-radius: 3px;
-    color: var(--dim);
-    transition: border-color 0.15s ease, color 0.15s ease;
-  }
-  .btn:hover { border-color: var(--accent); color: var(--accent); }
-  .btn.primary { color: #000; background: var(--accent); border-color: var(--accent); }
-  .btn.primary:hover { opacity: 0.85; color: #000; }
-
-  h2.section-title {
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    margin: 0 0 8px;
-    color: var(--text);
-  }
-  h2.section-title .n { color: var(--faint); }
-
-  .section-sub {
-    color: var(--dim);
-    font-size: 14px;
-    line-height: 1.7;
-    max-width: 520px;
-    margin: 0 0 36px;
-  }
-
-  pre.manifest {
-    margin: 0;
-    padding: 24px;
-    border: 1px solid var(--line);
-    background: #050505;
-    border-radius: 4px;
-    font-size: 13.5px;
-    line-height: 2;
-    overflow-x: auto;
-  }
-  .k { color: var(--text); }
-  .v { color: var(--dim); }
-  .punct { color: var(--faint); }
-
-  .rows {
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  .row {
-    display: grid;
-    grid-template-columns: 160px 1fr;
-    gap: 20px;
-    padding: 18px 20px;
-    border-bottom: 1px solid var(--line);
-    font-size: 13.5px;
-  }
-  .row:last-child { border-bottom: none; }
-  .row .label { color: var(--accent); white-space: nowrap; }
-  .row .desc { color: var(--dim); line-height: 1.7; }
-
-  @media (max-width: 560px) {
-    .row { grid-template-columns: 1fr; gap: 6px; }
-  }
-
-  .cta-section {
+  /* ---- spec table ---- */
+  .spec { width: 100%; border-collapse: collapse; }
+  .spec tr { border-bottom: 1px solid var(--rule-soft); }
+  .spec tr:last-child { border-bottom: none; }
+  .spec th {
     text-align: left;
-    padding: 90px 0;
+    font-weight: 400;
+    color: var(--ink-faint);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 13px 20px 13px 0;
+    white-space: nowrap;
+    vertical-align: top;
+    width: 34%;
   }
+  .spec td {
+    padding: 13px 0;
+    color: var(--ink);
+    vertical-align: top;
+  }
+  .spec td .sub { color: var(--ink-faint); }
 
-  .cta-section h2 {
-    font-family: var(--sans, inherit);
+  /* ---- prose / opinion ---- */
+  .opinion p {
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+    color: var(--ink);
+    margin: 0 0 18px;
+    max-width: 560px;
+  }
+  .opinion p:last-child { margin-bottom: 0; }
+  .opinion p .em { font-style: italic; color: var(--ink-soft); }
+  .opinion p b { font-weight: 600; }
+
+  /* ---- definition list ---- */
+  dl.defs { margin: 0; }
+  dl.defs > div {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 24px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  dl.defs > div:last-child { border-bottom: none; }
+  dl.defs dt {
+    color: var(--accent);
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+  dl.defs dd {
+    margin: 0;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+  dl.defs dd b { color: var(--ink); font-weight: 600; }
+
+  /* ---- code block ---- */
+  .runs-intro { color: var(--ink-soft); margin: 0 0 22px; max-width: 520px; line-height: 1.6; }
+  pre.code {
+    margin: 0;
+    padding: 22px 22px;
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--accent);
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.85;
+    color: var(--ink);
+  }
+  pre.code .cm { color: var(--ink-faint); }
+  pre.code .kw { color: var(--accent); }
+  pre.code .st { color: var(--ink-soft); }
+
+  /* ---- closing ---- */
+  .close { padding: 52px 0 48px; border-bottom: 1px solid var(--rule); }
+  .close h2 {
+    font-family: var(--serif);
+    font-weight: 400;
     font-size: clamp(24px, 4vw, 34px);
-    font-weight: 600;
     letter-spacing: -0.01em;
     margin: 0 0 16px;
-    color: var(--text);
+    line-height: 1.12;
   }
+  .close p { color: var(--ink-soft); margin: 0 0 28px; max-width: 460px; line-height: 1.6; }
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 13px 22px;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    transition: background 0.15s ease;
+  }
+  .cta:hover { background: var(--accent); color: var(--paper); }
+  .cta .arr { color: var(--paper); opacity: 0.6; }
 
-  .cta-section p { color: var(--dim); font-size: 14px; margin: 0 0 32px; }
-
-  footer { padding: 36px 0; border-bottom: none; }
-
-  .footer-row {
+  /* ---- footer ---- */
+  footer { padding: 34px 0 48px; }
+  .ornament {
+    text-align: center;
+    color: var(--ink-faint);
+    letter-spacing: 0.5em;
+    font-size: 13px;
+    margin: 0 0 22px;
+  }
+  .colophon {
     display: flex;
     justify-content: space-between;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 16px;
-    font-size: 12.5px;
-    color: var(--faint);
+    gap: 10px 20px;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    letter-spacing: 0.02em;
   }
+  .colophon a:hover { color: var(--accent); }
 
-  .footer-prompt .u { color: var(--dim); }
-  .footer-prompt .p { color: var(--accent); }
-
-  .footer-links { display: flex; gap: 20px; color: var(--dim); }
-  .footer-links a:hover { color: var(--accent); }
+  @media (max-width: 560px) {
+    .masthead { flex-direction: column; gap: 10px; }
+    .spec th { width: 42%; }
+    dl.defs > div { grid-template-columns: 1fr; gap: 6px; }
+    .meta-row { font-size: 10px; }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="wrap nav">
-    <div class="wordmark">vipernode<span class="us">_</span></div>
-    <nav class="nav-links">
-      <a href="#platform">platform</a>
-      <a href="#capabilities">capabilities</a>
-      <a href="#contact">contact</a>
+  <div class="sheet masthead">
+    <div class="brand">viper<span class="mark">/</span>node</div>
+    <nav>
+      <a href="#spec">specification</a>
+      <a href="#runs">interface</a>
+      <a href="#access">access</a>
     </nav>
   </div>
 </header>
 
-<main>
+<div class="sheet">
+  <div class="meta-row">
+    <span>Runtime Infrastructure</span>
+    <span>Rev. 2026.11 — Public</span>
+  </div>
+</div>
 
-  <section class="hero">
-    <div class="wrap">
-      <p class="eyebrow"><span class="comment">// infrastructure for agentic security</span></p>
-      <h1>The runtime layer for<br><span class="dim">autonomous cyber agents.</span></h1>
-      <p class="lede">ViperNode is the infrastructure companies run their agentic security stacks on — sandboxed execution, orchestration, and audit for every action an agent takes. We're not the agents. We're what they run on.</p>
+<main class="sheet">
 
-      <div class="term">
-        <div class="term-bar">
-          <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
-          <span style="margin-left:4px;">viper --status</span>
-        </div>
-        <div class="term-body" id="term-out"></div>
+  <div class="lede">
+    <h1>The ground your security<br>agents stand on.<br><span class="q">Not another agent.</span></h1>
+    <p class="deck">ViperNode is the runtime that offensive and defensive teams run their agentic stacks on — <b>sandboxed, orchestrated, and audited by default</b>. You bring the agents. We make them safe to run against real targets.</p>
+    <p class="builtfor">
+      <span class="k">Built for</span><span class="dot">·</span>red teams<span class="dot">·</span>detection engineering<span class="dot">·</span>continuous pentest<span class="dot">·</span>vulnerability research
+    </p>
+  </div>
+
+  <section id="spec">
+    <p class="sec-label"><span class="num">§01</span> Specification</p>
+    <table class="spec">
+      <tr>
+        <th>Isolation</th>
+        <td>Per-action microVM. <span class="sub">Default-deny egress, allowlisted scope. Containment is the floor, not a toggle.</span></td>
+      </tr>
+      <tr>
+        <th>Concurrency</th>
+        <td>Up to 512 agents per orchestrated run, <span class="sub">one control plane for the whole fleet.</span></td>
+      </tr>
+      <tr>
+        <th>Cold start</th>
+        <td>&lt; 400&thinsp;ms to first action.</td>
+      </tr>
+      <tr>
+        <th>Audit</th>
+        <td>Immutable, action-level log. <span class="sub">Tamper-evident, retained indefinitely.</span></td>
+      </tr>
+      <tr>
+        <th>Models</th>
+        <td>Bring your own. <span class="sub">Any provider, any agent framework, any scanner. No lock-in.</span></td>
+      </tr>
+      <tr>
+        <th>Deployment</th>
+        <td>Managed cloud, <span class="sub">or self-hosted inside your own VPC.</span></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="opinion">
+    <p class="sec-label"><span class="num">§02</span> A position</p>
+    <p>Every other “agentic security platform” hands you a model with a dashboard bolted on and calls it a product. We think that is exactly backwards.</p>
+    <p>The model was never the hard part. The hard part is running untrusted, self-directed code against live targets — at scale, under audit, <span class="em">without it slipping its lane or taking you down with it</span>. That is an infrastructure problem. Infrastructure is unglamorous, load-bearing, and the thing everyone skips.</p>
+    <p><b>We didn't skip it.</b> ViperNode is the layer underneath your agents, not one more competing for the same job.</p>
+  </section>
+
+  <section id="runs">
+    <p class="sec-label"><span class="num">§03</span> Interface</p>
+    <p class="runs-intro">An API with ergonomics meant for machines, not a console you babysit. Point it at an agent and a target; it handles isolation, scheduling, and the paper trail.</p>
+    <pre class="code"><span class="cm">// your code, your model — our runtime</span>
+<span class="kw">import</span> { ViperNode } <span class="kw">from</span> <span class="st">"@vipernode/sdk"</span>;
+
+<span class="kw">const</span> vn = <span class="kw">new</span> ViperNode({ org: <span class="st">"acme"</span>, key });
+
+<span class="kw">await</span> vn.run({
+  agent:   myAgent,            <span class="cm">// bring your own</span>
+  target:  <span class="st">"scope.acme.io"</span>,
+  sandbox: <span class="st">"hardened"</span>,         <span class="cm">// isolated microVM</span>
+  audit:   <span class="kw">true</span>,                <span class="cm">// immutable, on by default</span>
+});</pre>
+  </section>
+
+  <section>
+    <p class="sec-label"><span class="num">§04</span> Primitives</p>
+    <dl class="defs">
+      <div>
+        <dt>sandbox</dt>
+        <dd>Every action runs isolated and hardened. <b>Containment is the default</b> — not a setting you remember to turn on after the first incident.</dd>
       </div>
-
-      <div class="actions">
-        <a class="btn primary" href="mailto:hello@vipernode.tech?subject=Demo%20request" target="_blank" rel="noopener">book a demo</a>
-        <a class="btn" href="#capabilities">view capabilities →</a>
+      <div>
+        <dt>orchestrate</dt>
+        <dd>Schedule, coordinate, and pipeline fleets of agents across targets and tasks from a single control plane.</dd>
       </div>
-    </div>
-  </section>
-
-  <section id="platform">
-    <div class="wrap">
-      <h2 class="section-title"><span class="n">01 /</span> the problem</h2>
-      <p class="section-sub">Agentic security tooling moves fast. The infrastructure under it has to hold. Teams building offensive and defensive AI tooling need a place to run it that's isolated, observable, and accountable by default — not bolted on after an incident.</p>
-    </div>
-  </section>
-
-  <section id="capabilities">
-    <div class="wrap">
-      <h2 class="section-title"><span class="n">02 /</span> capabilities</h2>
-      <p class="section-sub">Four primitives. One control plane.</p>
-
-      <div class="rows">
-        <div class="row">
-          <div class="label">sandbox</div>
-          <div class="desc">Every agent action runs in an isolated, hardened compute environment. Untrusted or autonomous behavior stays contained — by default, not by convention.</div>
-        </div>
-        <div class="row">
-          <div class="label">orchestrate</div>
-          <div class="desc">Schedule, coordinate, and pipeline fleets of agents across targets and tasks, with a single control plane for the whole run.</div>
-        </div>
-        <div class="row">
-          <div class="label">audit</div>
-          <div class="desc">Full action-level logs and immutable audit trails for everything your agents do — the record you need to run offensive tooling responsibly and legally.</div>
-        </div>
-        <div class="row">
-          <div class="label">bring your own</div>
-          <div class="desc">No lock-in. Plug in any LLM, any scanner, any agent framework. ViperNode is the infrastructure underneath, not another walled garden.</div>
-        </div>
+      <div>
+        <dt>audit</dt>
+        <dd>A complete, tamper-evident record of everything every agent did. <b>The paperwork that makes offensive work defensible</b> — legally and internally.</dd>
       </div>
-    </div>
-  </section>
-
-  <section id="config">
-    <div class="wrap">
-      <h2 class="section-title"><span class="n">03 /</span> one manifest, one run</h2>
-      <p class="section-sub">Point ViperNode at your agents. It handles the rest.</p>
-      <pre class="manifest"><span class="punct">runtime:</span>
-  <span class="k">sandbox</span><span class="punct">:</span> <span class="v">hardened</span>
-  <span class="k">model</span><span class="punct">:</span>   <span class="v">bring-your-own</span>
-  <span class="k">agents</span><span class="punct">:</span>  <span class="v">fleet</span>
-  <span class="k">audit</span><span class="punct">:</span>   <span class="v">immutable-log</span>
-  <span class="k">status</span><span class="punct">:</span>  <span class="str">ready</span></pre>
-    </div>
-  </section>
-
-  <section class="cta-section" id="contact">
-    <div class="wrap">
-      <h2>Give your agents somewhere to run.</h2>
-      <p class="comment">// talk to us about deploying ViperNode for your security team</p>
-      <div class="actions" style="margin-top:0;">
-        <a class="btn primary" href="mailto:hello@vipernode.tech?subject=Demo%20request" target="_blank" rel="noopener">book a demo</a>
+      <div>
+        <dt>bring&#8209;your&#8209;own</dt>
+        <dd>Any model, any scanner, any framework plugs in. The infrastructure underneath — never a walled garden.</dd>
       </div>
-    </div>
+    </dl>
   </section>
+
+  <div class="close" id="access">
+    <h2>Give your agents<br>somewhere to run.</h2>
+    <p>Private beta for security teams running autonomous tooling in production. Tell us what you're running.</p>
+    <a class="cta" href="mailto:hello@vipernode.tech?subject=ViperNode%20access" target="_blank" rel="noopener">Request access <span class="arr">→</span></a>
+  </div>
 
 </main>
 
 <footer>
-  <div class="wrap footer-row">
-    <div class="footer-prompt"><span class="u">guest@vipernode</span><span class="punct">:</span><span class="p">~</span><span class="punct">$</span> <span class="cursor"></span></div>
-    <div class="footer-links">
-      <a href="mailto:hello@vipernode.tech" target="_blank" rel="noopener">hello@vipernode.tech</a>
-      <span>© 2026</span>
+  <div class="sheet">
+    <p class="ornament">~&nbsp;*&nbsp;~</p>
+    <div class="colophon">
+      <span>© 2026 ViperNode</span>
+      <span>vipernode.tech</span>
+      <a class="link" href="mailto:hello@vipernode.tech" target="_blank" rel="noopener">hello@vipernode.tech</a>
     </div>
   </div>
 </footer>
-
-<script>
-  (function () {
-    var lines = [
-      { p: '$ ', t: 'viper --status', cls: '' },
-      { p: '', t: 'sandbox ......... online', cls: 'ok' },
-      { p: '', t: 'orchestrator .... online', cls: 'ok' },
-      { p: '', t: 'audit log ....... streaming', cls: 'ok' },
-      { p: '', t: 'agents connected: 0', cls: 'out' }
-    ];
-    var el = document.getElementById('term-out');
-    if (!el) return;
-    var li = 0;
-
-    function typeLine() {
-      if (li >= lines.length) {
-        var cur = document.createElement('span');
-        cur.className = 'cursor';
-        el.appendChild(cur);
-        return;
-      }
-      var line = lines[li];
-      var full = line.p + line.t;
-      var pLen = line.p.length;
-
-      var row = document.createElement('div');
-      row.innerHTML = '<span class="prompt"></span><span class="' + (line.cls || '') + '"></span>';
-      el.appendChild(row);
-
-      var ci = 0;
-      (function step() {
-        ci++;
-        var shown = full.slice(0, ci);
-        row.children[0].textContent = shown.slice(0, pLen);
-        row.children[1].textContent = shown.slice(pLen);
-        if (ci < full.length) {
-          setTimeout(step, 14 + Math.random() * 18);
-        } else {
-          li++;
-          setTimeout(typeLine, 160);
-        }
-      })();
-    }
-    typeLine();
-  })();
-</script>
 
 </body>
 </html>
