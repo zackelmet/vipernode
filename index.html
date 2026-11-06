@@ -282,15 +282,6 @@
   .sweep { stroke: url(#sweepGrad); stroke-width: 1.5; }
   .spoke { stroke: rgba(255,255,255,0.045); stroke-width: 1; }
 
-  .hud {
-    position: absolute; left: 0; bottom: 0;
-    padding: 20px 0 20px 2px;
-    font-family: var(--display); font-weight: 500;
-    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--faint); line-height: 2.1; pointer-events: none;
-  }
-  .hud .v { color: var(--accent); }
-  .hud .d { color: var(--dim); }
   .hud-top {
     position: absolute; right: 0; top: 0;
     padding: 20px 2px 0 0; text-align: right;
@@ -450,11 +441,6 @@
         </div>
 
         <div class="hud-top">VIPERNODE // RUNTIME</div>
-        <div class="hud">
-          <div id="hud-line1">BLOB SYNC <span class="d">·······</span> <span class="v" id="hud-pct">000%</span></div>
-          <div id="hud-line2">NODES ACTIVE <span class="d">······</span> <span class="v" id="hud-nodes">00/22</span></div>
-          <div>SECTION <span class="d">···········</span> <span class="v" id="hud-sec">—</span></div>
-        </div>
       </div>
     </div>
 
@@ -515,11 +501,6 @@
   });
 
   var sweep = document.getElementById('sweep');
-  var hudPct = document.getElementById('hud-pct');
-  var hudNodes = document.getElementById('hud-nodes');
-  var hudSec = document.getElementById('hud-sec');
-  var hudLine1 = document.getElementById('hud-line1');
-  var hudLine2 = document.getElementById('hud-line2');
   var blobLayer = document.getElementById('blobLayer');
   var ringLayer = document.getElementById('ringLayer');
 
@@ -531,7 +512,6 @@
     target = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
   }
 
-  function pad(n, len) { n = String(n); while (n.length < len) n = '0' + n; return n; }
   function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
   function remap(v, a, b) { return clamp01((v - a) / (b - a)); }
   function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
@@ -541,10 +521,9 @@
   // window.__vizMorphT/__vizRevealT each frame so the two stay in lockstep
   // without duplicating the scroll-smoothing math. MORPH_END -> 1 drives the
   // ring system right here, completely unchanged from before.
-  var MORPH_END = 0.26;
-  var D_END = 0.86;   // 3D sequence fully resolved, right before the ring reveal
+  var MORPH_END = 0.42;   // more scroll space for the 3D sequence (was 0.26)
+  var D_END = 0.84;   // 3D sequence fully resolved, right before the ring reveal
 
-  var lastActive = -1, lastMode = '';
   function render(now) {
     cur += (target - cur) * 0.08;
     if (Math.abs(target - cur) < 0.0005) cur = target;
@@ -576,47 +555,15 @@
     sweep.setAttribute('transform', 'rotate(' + (base * 1.6 + idle).toFixed(2) + ' ' + CX + ' ' + CY + ')');
 
     // activate nodes up to ring progress
-    var active = 0;
     for (var i = 0; i < allNodes.length; i++) {
       var on = ringT >= allNodes[i].thresh;
-      if (on) active++;
       var cls = allNodes[i].el.getAttribute('class');
       if (on && cls.indexOf('on') < 0) { allNodes[i].el.setAttribute('class', 'node on'); allNodes[i].el.setAttribute('r', '3.4'); }
       else if (!on && cls.indexOf('on') >= 0) { allNodes[i].el.setAttribute('class', 'node'); allNodes[i].el.setAttribute('r', '2.6'); }
     }
 
-    if (active !== lastActive) {
-      hudNodes.textContent = pad(active, 2) + '/' + total;
-      lastActive = active;
-    }
-
-    var inBlobMode = morphT < 1;
-    var mode = inBlobMode ? 'blob' : 'ring';
-    if (mode !== lastMode) {
-      hudLine1.firstChild.textContent = inBlobMode ? 'BLOB SYNC ' : 'RING SYNC ';
-      hudLine2.style.opacity = inBlobMode ? '0.35' : '1';
-      lastMode = mode;
-    }
-    hudPct.textContent = pad(Math.round((inBlobMode ? morphT : ringT) * 100), 3) + '%';
-
     requestAnimationFrame(render);
   }
-
-  // current section label via IntersectionObserver
-  var labels = {
-    spec: '01 · SPEC', interface: '03 · IFACE', access: '05 · ACCESS'
-  };
-  var secEls = document.querySelectorAll('.lede, section, .close');
-  var secNames = ['00 · INTRO','01 · SPEC','02 · POSITION','03 · IFACE','04 · PRIM','05 · ACCESS'];
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (e) {
-      if (e.isIntersecting) {
-        var idx = Array.prototype.indexOf.call(secEls, e.target);
-        if (idx >= 0 && secNames[idx]) hudSec.textContent = secNames[idx];
-      }
-    });
-  }, { rootMargin: '-45% 0px -45% 0px' });
-  secEls.forEach(function (el) { io.observe(el); });
 
   window.addEventListener('scroll', readProgress, { passive: true });
   window.addEventListener('resize', readProgress);
@@ -665,7 +612,7 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   var key = new THREE.DirectionalLight(0xffffff, 1.3);
   key.position.set(3, 4, 5);
   scene.add(key);
-  var rim = new THREE.DirectionalLight(0xff6b60, 0.7);
+  var rim = new THREE.DirectionalLight(0x8fb4ff, 0.65);
   rim.position.set(-4, -2, -3);
   scene.add(rim);
 
@@ -695,9 +642,46 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   }
   blobGeo.computeVertexNormals();
 
+  // Procedural snake-scale relief (canvas-generated, no external image) —
+  // on-brand for "Viper" and a lot more interesting than flat chrome. Each
+  // scale is a radial gradient (bright center, dark groove at the edge) laid
+  // out in offset rows like real reptile scales; used as a bump map so the
+  // environment reflections actually pick up the relief.
+  function makeScaleTexture() {
+    var size = 512;
+    var cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(0, 0, size, size);
+    var cols = 11, rows = 13;
+    var rw = size / cols, rh = size / rows;
+    for (var row = -1; row <= rows; row++) {
+      var offsetX = (((row % 2) + 2) % 2) * (rw / 2);
+      for (var col = -1; col <= cols; col++) {
+        var cx = col * rw + offsetX + rw / 2;
+        var cy = row * rh * 0.82 + rh / 2;
+        var rad = rw * 0.64;
+        var grad = ctx.createRadialGradient(cx, cy - rad * 0.2, rad * 0.06, cx, cy, rad);
+        grad.addColorStop(0, '#e9e9e9');
+        grad.addColorStop(0.65, '#8f8f8f');
+        grad.addColorStop(1, '#2a2a2a');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rad, rad * 0.86, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    var tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(6, 6);
+    return tex;
+  }
+
   var blobMat = new THREE.MeshPhysicalMaterial({
-    color: 0xf2efe9, metalness: 1, roughness: 0.14,
-    clearcoat: 0.25, clearcoatRoughness: 0.25, envMapIntensity: 1.3
+    color: 0xf0ede8, metalness: 1, roughness: 0.16,
+    clearcoat: 0.2, clearcoatRoughness: 0.3, envMapIntensity: 1.3,
+    bumpMap: makeScaleTexture(), bumpScale: 0.018
   });
   var blobMesh = new THREE.Mesh(blobGeo, blobMat);
   scene.add(blobMesh);
@@ -705,12 +689,13 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   // ---------- cube cluster: the morph target ----------
   // Small boxes at jittered offsets/rotations/sizes, not a clean grid — an
   // irregular, faceted "hardened crystal" cluster rather than a tidy cube.
+  // Crimson to match the site's own accent color instead of an arbitrary hue.
   var cubeGroup = new THREE.Group();
   var cubeMat = new THREE.MeshPhysicalMaterial({
-    color: 0x3fe8d4, metalness: 0.15, roughness: 0.2,
+    color: 0xe5484d, metalness: 0.15, roughness: 0.2,
     transparent: true, opacity: 0.5, envMapIntensity: 1.0
   });
-  var edgeMat = new THREE.LineBasicMaterial({ color: 0x8ffbe8, transparent: true, opacity: 0.9 });
+  var edgeMat = new THREE.LineBasicMaterial({ color: 0xff8f86, transparent: true, opacity: 0.9 });
   var CUBE_COUNT = 17;
   for (var ci = 0; ci < CUBE_COUNT; ci++) {
     var size = 0.3 + Math.random() * 0.34;
@@ -741,10 +726,14 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   }
 
   // ---------- scroll phases, all within window.__vizMorphT's 0..1 range ----------
-  var SETTLE_END   = 0.30;  // blob idles in open space, no frame yet
-  var BOXIN_END    = 0.54;  // frame fully drawn in, blob settled to fit inside it
-  var FORM_START   = 0.56;  // blob -> cube-cluster crossfade begins
-  var FORM_END     = 0.84;  // cube-cluster fully formed, blob fully gone
+  // each phase gets its own clearly separated chunk of scroll, with a held
+  // beat between transitions rather than one bleeding straight into the next
+  var SETTLE_END   = 0.24;  // blob idles in open space, no frame yet
+  var BOXIN_END    = 0.42;  // frame fully drawn in, blob settled to fit inside it
+  // 0.42 -> 0.50: held beat, settled in the frame, nothing changing
+  var FORM_START   = 0.50;  // blob -> cube-cluster crossfade begins
+  var FORM_END     = 0.74;  // cube-cluster fully formed, blob fully gone
+  // 0.74 -> D_END (classic script): held beat, cube sits fully formed before the ring reveal
 
   var resizeObs = new ResizeObserver(function () { resize(); });
   resizeObs.observe(stage);
@@ -768,7 +757,7 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
 
     // blob: open and large, settles smaller to fit the frame, then dissolves
     // away as the cube-cluster takes its place
-    var blobScale = lerp(1.05, 0.62, boxInEase) * (1 - formEase);
+    var blobScale = lerp(0.56, 0.38, boxInEase) * (1 - formEase);
     blobMesh.scale.setScalar(Math.max(0.0001, blobScale));
     blobMesh.position.y = lerp(0.35, 0, boxInEase);
     blobMat.opacity = 1; // opaque chrome, no fade needed — it shrinks to nothing instead
