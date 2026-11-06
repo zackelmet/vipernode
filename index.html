@@ -9,6 +9,9 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" href="/fonts/Orbitron-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.min.js" } }
+</script>
 <style>
   @font-face {
     font-family: 'Orbitron';
@@ -123,18 +126,41 @@
     will-change: transform, opacity;
   }
 
-  /* ---------- blob / mountain / shatter ---------- */
-  #blobShadow { fill: #000; opacity: 0.4; filter: blur(6px); }
-  #mountainPath {
-    fill: url(#blobGrad);
-    filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 22px rgba(168, 57, 46, 0.12));
-  }
-  #mountainGrain {
-    mix-blend-mode: overlay;
-    opacity: 0.6;
+  /* ---------- 3D blob / frame / cube-cluster ---------- */
+  #three-canvas { width: 100%; height: 100%; display: block; }
+  .frame {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 340px; height: 340px;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--rule);
     pointer-events: none;
+    opacity: 0;
   }
-  .shard { fill: url(#blobGrad); transform-box: fill-box; transform-origin: center; }
+  .frame::before {
+    content: '';
+    position: absolute; inset: -12px;
+    border: 1px solid var(--rule-soft);
+  }
+  .frame-dot {
+    position: absolute;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    border: 1px solid var(--faint);
+  }
+  .frame-dot::after {
+    content: '';
+    position: absolute; left: 50%; top: 50%;
+    width: 1px; height: 46px;
+    background: var(--rule-soft);
+    transform: translateX(-50%);
+  }
+  .frame-dot.fd-a { left: -3px; top: -28px; }
+  .frame-dot.fd-b { right: -3px; top: -28px; }
+  .frame-dot.fd-c { left: -3px; bottom: -28px; }
+  .frame-dot.fd-c::after { top: auto; bottom: 50%; }
+  .frame-dot.fd-d { right: -3px; bottom: -28px; }
+  .frame-dot.fd-d::after { top: auto; bottom: 50%; }
 
   /* ---------- meta row ---------- */
   .meta-row {
@@ -391,28 +417,13 @@
       <div class="viz-sticky">
 
         <div class="viz-layer" id="blobLayer">
-          <svg class="viz-svg" viewBox="0 0 360 360" fill="none" id="blobSvg">
-            <defs>
-              <radialGradient id="blobGrad" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(126 112) scale(205)">
-                <stop offset="0%" stop-color="#c9897a"/>
-                <stop offset="26%" stop-color="#a8392e"/>
-                <stop offset="60%" stop-color="#671e19"/>
-                <stop offset="100%" stop-color="#1c0d0a"/>
-              </radialGradient>
-              <filter id="grain" x="-20%" y="-20%" width="140%" height="140%">
-                <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="3" seed="11" result="noise"/>
-                <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.33 0.33 0.33 0 0" result="noiseA"/>
-                <feComponentTransfer in="noiseA" result="noiseAdj">
-                  <feFuncA type="linear" slope="1.7" intercept="-0.28"/>
-                </feComponentTransfer>
-                <feComposite in="noiseAdj" in2="SourceGraphic" operator="in"/>
-              </filter>
-            </defs>
-            <ellipse id="blobShadow" cx="180" cy="300" rx="96" ry="17"/>
-            <path id="mountainPath"/>
-            <path id="mountainGrain" fill="#000"/>
-            <g id="shards"></g>
-          </svg>
+          <canvas id="three-canvas"></canvas>
+          <div class="frame" id="frame">
+            <span class="frame-dot fd-a"></span>
+            <span class="frame-dot fd-b"></span>
+            <span class="frame-dot fd-c"></span>
+            <span class="frame-dot fd-d"></span>
+          </div>
         </div>
 
         <div class="viz-layer" id="ringLayer">
@@ -523,85 +534,15 @@
   function pad(n, len) { n = String(n); while (n.length < len) n = '0' + n; return n; }
   function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
   function remap(v, a, b) { return clamp01((v - a) / (b - a)); }
-  function lerp(a, b, t) { return a + (b - a) * t; }
   function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
-  function easeOutQuad(t) { return 1 - (1 - t) * (1 - t); }
-  function smoothstep(t) { return t * t * (3 - 2 * t); }
 
-  // ---------- blob / viper-head / shatter shape system ----------
-  // 13 points, irregular spacing — an even point count with alternating
-  // high/low radii reads as an N-pointed star no matter what it's "supposed"
-  // to be, so the jaggedness is deliberately directional and asymmetric
-  // instead (a thin neck on one side, a wide head mass on the other), which
-  // is also just what the brand's own emblem already looks like.
-  var SHAPE_N = 13;
-  var ANGLE_JITTER = [0, 0.09, -0.05, 0.12, -0.08, 0.04, -0.11, 0.07, -0.03, 0.10, -0.09, 0.05, -0.06];
-  var SHAPE_ANGLES = [];
-  for (var sa = 0; sa < SHAPE_N; sa++) {
-    SHAPE_ANGLES.push((sa / SHAPE_N) * Math.PI * 2 - Math.PI / 2 + ANGLE_JITTER[sa]);
-  }
-  // lobsided: bulges hard over points 1-3, pinches over 7-8, smooth elsewhere
-  var BLOB_R = [112, 138, 158, 160, 128, 100, 82, 62, 58, 68, 88, 102, 118];
-  // abstract viper head: a thin neck (idx 0,1,10,11,12 — all small) opens
-  // into a head mass with one dominant snout spike (idx6) and two asymmetric
-  // jaw/hood flares (idx3, idx8) either side of it — directional, not radial,
-  // which is what keeps it from reading as a star or a mountain range.
-  var HEAD_R = [45, 42, 72, 140, 125, 158, 195, 112, 122, 66, 48, 55, 50];
-
-  var mountainPath = document.getElementById('mountainPath');
-  var mountainGrain = document.getElementById('mountainGrain');
-  var blobShadowEl = document.getElementById('blobShadow');
-  var shardsG = document.getElementById('shards');
-
-  function shapePoints(radii, jitterAmp, now) {
-    var pts = [];
-    for (var i = 0; i < SHAPE_N; i++) {
-      var j = jitterAmp ? Math.sin(now * 0.0011 + i * 2.1) * jitterAmp : 0;
-      var r = radii[i] + j;
-      pts.push({ x: 180 + Math.cos(SHAPE_ANGLES[i]) * r, y: 180 + Math.sin(SHAPE_ANGLES[i]) * r });
-    }
-    return pts;
-  }
-
-  // Closed Catmull-Rom -> cubic bezier, tension = roundness: 1 is a smooth
-  // organic curve through every point, 0 is a straight-edged polygon through
-  // those SAME points — lets blob and mountain share identical vertices.
-  function buildPath(pts, roundness) {
-    var n = pts.length;
-    var d = 'M ' + pts[0].x.toFixed(2) + ' ' + pts[0].y.toFixed(2) + ' ';
-    for (var i = 0; i < n; i++) {
-      var p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
-      var k = roundness / 6;
-      var c1x = p1.x + (p2.x - p0.x) * k, c1y = p1.y + (p2.y - p0.y) * k;
-      var c2x = p2.x - (p3.x - p1.x) * k, c2y = p2.y - (p3.y - p1.y) * k;
-      d += 'C ' + c1x.toFixed(2) + ' ' + c1y.toFixed(2) + ' ' + c2x.toFixed(2) + ' ' + c2y.toFixed(2) + ' ' + p2.x.toFixed(2) + ' ' + p2.y.toFixed(2) + ' ';
-    }
-    return d + 'Z';
-  }
-
-  // Shatter fragments: fan-triangulated from the frozen head silhouette,
-  // built once on first entry so each shard is a literal piece of that shape.
-  var shards = [], shardsBuilt = false;
-  function buildShards() {
-    if (shardsBuilt) return;
-    shardsBuilt = true;
-    var pts = shapePoints(HEAD_R, 0, 0);
-    for (var i = 0; i < SHAPE_N; i++) {
-      var a = pts[i], b = pts[(i + 1) % SHAPE_N];
-      var path = document.createElementNS(svgNS, 'path');
-      path.setAttribute('class', 'shard');
-      path.setAttribute('d', 'M 180 180 L ' + a.x.toFixed(2) + ' ' + a.y.toFixed(2) + ' L ' + b.x.toFixed(2) + ' ' + b.y.toFixed(2) + ' Z');
-      shardsG.appendChild(path);
-      var midAng = Math.atan2((a.y + b.y) / 2 - 180, (a.x + b.x) / 2 - 180) + (Math.random() - 0.5) * 0.5;
-      shards.push({ el: path, angle: midAng, dist: 120 + Math.random() * 150, rot: (Math.random() - 0.5) * 3, delay: Math.random() * 0.25 });
-    }
-  }
-
-  // scroll range [0, MORPH_END] owns the blob -> viper-head -> shatter ->
-  // ring transition; the rest of the page (MORPH_END -> 1) drives the ring
+  // scroll range [0, MORPH_END] drives the 3D blob -> frame -> cube-cluster
+  // sequence over in the Three.js module script below — that script reads
+  // window.__vizMorphT/__vizRevealT each frame so the two stay in lockstep
+  // without duplicating the scroll-smoothing math. MORPH_END -> 1 drives the
+  // ring system right here, completely unchanged from before.
   var MORPH_END = 0.26;
-  var A_END = 0.40;   // lobsided blob settles before it starts changing shape
-  var B_END = 0.72;   // fully-formed viper head, right before it shatters
+  var D_END = 0.86;   // 3D sequence fully resolved, right before the ring reveal
 
   var lastActive = -1, lastMode = '';
   function render(now) {
@@ -609,48 +550,14 @@
     if (Math.abs(target - cur) < 0.0005) cur = target;
 
     var morphT = remap(cur, 0, MORPH_END);
-    var shapeT = smoothstep(remap(morphT, A_END, B_END));   // 0 blob -> 1 viper head
-    var shatterT = remap(morphT, B_END, 1);
-
-    if (shatterT <= 0) {
-      // scrolling back up out of the shatter phase: the shard fragments
-      // were only ever animated forward (shatterT > 0) and otherwise just
-      // freeze wherever they last were, so without this they sit there as
-      // a permanent ghost of the shattered shape on top of the reforming
-      // blob/head. Hide them outright whenever we're not actively shattering.
-      shardsG.style.opacity = 0;
-      var radii = [];
-      for (var ri = 0; ri < SHAPE_N; ri++) radii.push(lerp(BLOB_R[ri], HEAD_R[ri], shapeT));
-      var jitterAmp = reduce ? 0 : lerp(9, 2, shapeT);
-      var pts = shapePoints(radii, jitterAmp, now);
-      var dAttr = buildPath(pts, 1 - shapeT);
-      mountainPath.setAttribute('d', dAttr);
-      mountainGrain.setAttribute('d', dAttr);
-      mountainPath.style.opacity = 1;
-      mountainGrain.style.opacity = 0.6;
-      blobShadowEl.style.opacity = 0.4;
-    } else {
-      buildShards();
-      shardsG.style.opacity = 1;
-      mountainPath.style.opacity = Math.max(0, 1 - shatterT * 10);
-      mountainGrain.style.opacity = Math.max(0, 1 - shatterT * 10) * 0.6;
-      blobShadowEl.style.opacity = Math.max(0, 1 - shatterT * 6) * 0.4;
-      for (var si = 0; si < shards.length; si++) {
-        var s = shards[si];
-        var lt = remap(shatterT, s.delay, 1);
-        var eased = easeOutQuad(lt);
-        var dx = Math.cos(s.angle) * s.dist * eased;
-        var dy = Math.sin(s.angle) * s.dist * eased + eased * eased * 70;
-        var rot = s.rot * eased * 320;
-        s.el.setAttribute('transform', 'translate(' + dx.toFixed(1) + ' ' + dy.toFixed(1) + ') rotate(' + rot.toFixed(1) + ')');
-        s.el.style.opacity = 1 - eased;
-      }
-    }
+    var revealT = remap(morphT, D_END, 1);
+    window.__vizMorphT = morphT;
+    window.__vizRevealT = revealT;
 
     blobLayer.style.pointerEvents = morphT >= 1 ? 'none' : '';
 
-    // rings fade/scale in as the shatter clears, so the radar is what's left behind
-    var ringInEase = easeOutCubic(shatterT);
+    // rings fade/scale in as the 3D sequence resolves, so the radar is what's left behind
+    var ringInEase = easeOutCubic(revealT);
     ringLayer.style.opacity = ringInEase;
     ringLayer.style.transform = 'scale(' + (0.78 + ringInEase * 0.22).toFixed(3) + ')';
 
@@ -715,6 +622,182 @@
   window.addEventListener('resize', readProgress);
   readProgress();
   requestAnimationFrame(render);
+})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
+
+(function () {
+  var canvas = document.getElementById('three-canvas');
+  var stage = document.getElementById('blobLayer');
+  var frameEl = document.getElementById('frame');
+  if (!canvas || !stage || !frameEl) return;
+
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function remap(v, a, b) { return clamp01((v - a) / (b - a)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function smoothstep(t) { return t * t * (3 - 2 * t); }
+
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  } catch (e) {
+    return; // no WebGL — leave the canvas blank, the ring system is fully independent
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+  camera.position.set(0, 0, 9);
+
+  // Studio-style environment for real chrome reflections — procedurally
+  // generated (RoomEnvironment + PMREM), no external HDRI file to fetch.
+  var pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.035).texture;
+
+  var key = new THREE.DirectionalLight(0xffffff, 1.3);
+  key.position.set(3, 4, 5);
+  scene.add(key);
+  var rim = new THREE.DirectionalLight(0xff6b60, 0.7);
+  rim.position.set(-4, -2, -3);
+  scene.add(rim);
+
+  // ---------- blob: deformed icosphere, chrome material ----------
+  // Lobsided, directional bumps baked into the base geometry (not per-frame
+  // noise) — cheap, and the asymmetry reads clearly as the piece slowly
+  // tumbles and catches the environment reflection differently each turn.
+  var blobGeo = new THREE.IcosahedronGeometry(1.55, 5);
+  var bumps = [
+    { c: new THREE.Vector3(0.6, 0.5, 0.3).normalize(), a: 0.5, f: 2.1 },
+    { c: new THREE.Vector3(-0.5, -0.6, 0.4).normalize(), a: -0.38, f: 2.6 },
+    { c: new THREE.Vector3(0.2, -0.75, -0.45).normalize(), a: 0.3, f: 3.0 },
+    { c: new THREE.Vector3(-0.7, 0.35, -0.5).normalize(), a: -0.22, f: 2.3 },
+    { c: new THREE.Vector3(0.75, -0.1, 0.6).normalize(), a: 0.22, f: 3.4 }
+  ];
+  var posAttr = blobGeo.attributes.position;
+  var dir = new THREE.Vector3();
+  for (var vi = 0; vi < posAttr.count; vi++) {
+    dir.set(posAttr.getX(vi), posAttr.getY(vi), posAttr.getZ(vi)).normalize();
+    var bump = 0;
+    for (var bi = 0; bi < bumps.length; bi++) {
+      var d = Math.max(0, dir.dot(bumps[bi].c));
+      bump += bumps[bi].a * Math.pow(d, bumps[bi].f);
+    }
+    var r = blobGeo.parameters.radius * (1 + bump);
+    posAttr.setXYZ(vi, dir.x * r, dir.y * r, dir.z * r);
+  }
+  blobGeo.computeVertexNormals();
+
+  var blobMat = new THREE.MeshPhysicalMaterial({
+    color: 0xf2efe9, metalness: 1, roughness: 0.14,
+    clearcoat: 0.25, clearcoatRoughness: 0.25, envMapIntensity: 1.3
+  });
+  var blobMesh = new THREE.Mesh(blobGeo, blobMat);
+  scene.add(blobMesh);
+
+  // ---------- cube cluster: the morph target ----------
+  // Small boxes at jittered offsets/rotations/sizes, not a clean grid — an
+  // irregular, faceted "hardened crystal" cluster rather than a tidy cube.
+  var cubeGroup = new THREE.Group();
+  var cubeMat = new THREE.MeshPhysicalMaterial({
+    color: 0x3fe8d4, metalness: 0.15, roughness: 0.2,
+    transparent: true, opacity: 0.5, envMapIntensity: 1.0
+  });
+  var edgeMat = new THREE.LineBasicMaterial({ color: 0x8ffbe8, transparent: true, opacity: 0.9 });
+  var CUBE_COUNT = 17;
+  for (var ci = 0; ci < CUBE_COUNT; ci++) {
+    var size = 0.3 + Math.random() * 0.34;
+    var bg = new THREE.BoxGeometry(size, size, size);
+    var bm = new THREE.Mesh(bg, cubeMat);
+    var radius = 0.25 + Math.random() * 0.85;
+    var theta = Math.random() * Math.PI * 2;
+    var phi = Math.acos(2 * Math.random() - 1);
+    bm.position.set(
+      radius * Math.sin(phi) * Math.cos(theta),
+      radius * Math.sin(phi) * Math.sin(theta),
+      radius * Math.cos(phi)
+    );
+    bm.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    cubeGroup.add(bm);
+    var edges = new THREE.LineSegments(new THREE.EdgesGeometry(bg), edgeMat);
+    bm.add(edges);
+  }
+  cubeGroup.scale.setScalar(0.001);
+  scene.add(cubeGroup);
+
+  function setGroupOpacity(group, op) {
+    group.traverse(function (obj) {
+      if (obj.material && 'opacity' in obj.material) {
+        obj.material.opacity = obj.material === edgeMat ? op * 0.9 : op * 0.5;
+      }
+    });
+  }
+
+  // ---------- scroll phases, all within window.__vizMorphT's 0..1 range ----------
+  var SETTLE_END   = 0.30;  // blob idles in open space, no frame yet
+  var BOXIN_END    = 0.54;  // frame fully drawn in, blob settled to fit inside it
+  var FORM_START   = 0.56;  // blob -> cube-cluster crossfade begins
+  var FORM_END     = 0.84;  // cube-cluster fully formed, blob fully gone
+
+  var resizeObs = new ResizeObserver(function () { resize(); });
+  resizeObs.observe(stage);
+  function resize() {
+    var w = stage.clientWidth || 1, h = stage.clientHeight || 1;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+
+  function tick(now) {
+    requestAnimationFrame(tick);
+    var morphT = window.__vizMorphT || 0;
+    var revealT = window.__vizRevealT || 0;
+
+    var settleEase = smoothstep(remap(morphT, 0, SETTLE_END));
+    var boxInEase = smoothstep(remap(morphT, SETTLE_END, BOXIN_END));
+    var formEase = smoothstep(remap(morphT, FORM_START, FORM_END));
+    var leaveEase = revealT; // 0..1 as the ring takes over
+
+    // blob: open and large, settles smaller to fit the frame, then dissolves
+    // away as the cube-cluster takes its place
+    var blobScale = lerp(1.05, 0.62, boxInEase) * (1 - formEase);
+    blobMesh.scale.setScalar(Math.max(0.0001, blobScale));
+    blobMesh.position.y = lerp(0.35, 0, boxInEase);
+    blobMat.opacity = 1; // opaque chrome, no fade needed — it shrinks to nothing instead
+
+    // frame: fades in as the blob settles, fades back out once the ring takes over
+    frameEl.style.opacity = boxInEase * (1 - leaveEase);
+
+    // cube cluster: grows in place of the blob, then shrinks/fades fully away
+    // as the ring takes over (both driven all the way to exactly 0 — a
+    // non-zero floor here previously left a faint frozen cube visible
+    // whenever a big scroll jump stepped past the fade window in one tick)
+    var cubeScale = formEase * (1 - leaveEase);
+    cubeGroup.scale.setScalar(Math.max(0.0001, cubeScale));
+    setGroupOpacity(cubeGroup, formEase * (1 - leaveEase));
+
+    if (!reduce) {
+      blobMesh.rotation.y += 0.0035 * (1 - formEase * 0.5);
+      blobMesh.rotation.x += 0.0012;
+      cubeGroup.rotation.y += 0.0022;
+      cubeGroup.rotation.x += 0.0009;
+    }
+
+    // always render — skipping this when "fully revealed" raced against the
+    // scroll-position smoothing: a big scroll jump can step cur across the
+    // whole fade window in a single frame, and skipping render() right after
+    // freezes the canvas on a frame from BEFORE the fade actually happened.
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(tick);
 })();
 </script>
 
