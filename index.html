@@ -636,6 +636,14 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   ];
   var posAttr = blobGeo.attributes.position;
   var dir = new THREE.Vector3();
+  // base direction/rest-radius/phase per vertex, captured once — tick()
+  // breathes each vertex around its OWN rest radius on its OWN phase, so
+  // different facets swell and shrink independently instead of the whole
+  // shape pulsing uniformly.
+  var vCount = posAttr.count;
+  var baseDirs = new Float32Array(vCount * 3);
+  var baseRadii = new Float32Array(vCount);
+  var vPhase = new Float32Array(vCount);
   for (var vi = 0; vi < posAttr.count; vi++) {
     dir.set(posAttr.getX(vi), posAttr.getY(vi), posAttr.getZ(vi)).normalize();
     var bump = 0;
@@ -645,6 +653,12 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
     }
     var r = blobGeo.parameters.radius * (1 + bump);
     posAttr.setXYZ(vi, dir.x * r, dir.y * r, dir.z * r);
+    baseDirs[vi * 3] = dir.x; baseDirs[vi * 3 + 1] = dir.y; baseDirs[vi * 3 + 2] = dir.z;
+    baseRadii[vi] = r;
+    // spatial phase offset from direction, not vertex index — so neighboring
+    // vertices (close in space) breathe roughly in sync, reading as a single
+    // part of the shape swelling together rather than per-vertex noise.
+    vPhase[vi] = dir.x * 2.6 + dir.y * 3.1 - dir.z * 2.1;
   }
   blobGeo.computeVertexNormals();
 
@@ -739,10 +753,24 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
     var leaveEase = revealT; // 0..1 as the ring takes over
 
     // blob: open and large, settles smaller to fit the frame, then dissolves
-    // away as the cube-cluster takes its place. A slow sinusoidal "breathing"
-    // pulse rides on top of the scroll-driven scale for some idle life.
-    var breathe = reduce ? 1 : (1 + Math.sin(now * 0.0009) * 0.045);
-    var blobScale = lerp(0.56, 0.38, boxInEase) * (1 - formEase) * breathe;
+    // away as the cube-cluster takes its place.
+    if (!reduce) {
+      for (var vi2 = 0; vi2 < vCount; vi2++) {
+        var wobble = Math.sin(now * 0.00055 + vPhase[vi2]) * 0.07;
+        var r2 = baseRadii[vi2] * (1 + wobble);
+        posAttr.setXYZ(vi2, baseDirs[vi2 * 3] * r2, baseDirs[vi2 * 3 + 1] * r2, baseDirs[vi2 * 3 + 2] * r2);
+      }
+      posAttr.needsUpdate = true;
+      // the edge-line overlay is a separate static snapshot geometry, not
+      // linked to blobGeo's live positions — re-derive it each frame so the
+      // crimson outlines stay aligned to the actual (now independently
+      // breathing) facets instead of drifting out of sync. Tiny geometry
+      // (~320 faces), cheap to rebuild every frame.
+      var oldEdgeGeo = blobEdges.geometry;
+      blobEdges.geometry = new THREE.EdgesGeometry(blobGeo);
+      oldEdgeGeo.dispose();
+    }
+    var blobScale = lerp(0.38, 0.26, boxInEase) * (1 - formEase);
     blobMesh.scale.setScalar(Math.max(0.0001, blobScale));
     blobMesh.position.y = lerp(0.35, 0, boxInEase);
     blobMat.opacity = 1; // opaque chrome, no fade needed — it shrinks to nothing instead
