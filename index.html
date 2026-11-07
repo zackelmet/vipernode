@@ -626,7 +626,7 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   // Lobsided, directional bumps baked into the base geometry (not per-frame
   // noise) — cheap, and the asymmetry reads clearly as the piece slowly
   // tumbles and catches the environment reflection differently each turn.
-  var blobGeo = new THREE.IcosahedronGeometry(1.55, 5);
+  var blobGeo = new THREE.IcosahedronGeometry(1.55, 2);
   var bumps = [
     { c: new THREE.Vector3(0.6, 0.5, 0.3).normalize(), a: 0.5, f: 2.1 },
     { c: new THREE.Vector3(-0.5, -0.6, 0.4).normalize(), a: -0.38, f: 2.6 },
@@ -648,48 +648,21 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   }
   blobGeo.computeVertexNormals();
 
-  // Procedural snake-scale relief (canvas-generated, no external image) —
-  // on-brand for "Viper" and a lot more interesting than flat chrome. Each
-  // scale is a radial gradient (bright center, dark groove at the edge) laid
-  // out in offset rows like real reptile scales; used as a bump map so the
-  // environment reflections actually pick up the relief.
-  function makeScaleTexture() {
-    var size = 512;
-    var cv = document.createElement('canvas');
-    cv.width = cv.height = size;
-    var ctx = cv.getContext('2d');
-    ctx.fillStyle = '#3a3a3a';
-    ctx.fillRect(0, 0, size, size);
-    var cols = 11, rows = 13;
-    var rw = size / cols, rh = size / rows;
-    for (var row = -1; row <= rows; row++) {
-      var offsetX = (((row % 2) + 2) % 2) * (rw / 2);
-      for (var col = -1; col <= cols; col++) {
-        var cx = col * rw + offsetX + rw / 2;
-        var cy = row * rh * 0.82 + rh / 2;
-        var rad = rw * 0.64;
-        var grad = ctx.createRadialGradient(cx, cy - rad * 0.2, rad * 0.06, cx, cy, rad);
-        grad.addColorStop(0, '#e9e9e9');
-        grad.addColorStop(0.65, '#8f8f8f');
-        grad.addColorStop(1, '#2a2a2a');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rad, rad * 0.86, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    var tex = new THREE.CanvasTexture(cv);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(6, 6);
-    return tex;
-  }
-
+  // Faceted crimson gem: flat shading makes each triangle of the (now much
+  // lower-detail) icosahedron read as a deliberate cut facet rather than an
+  // accidentally-chunky sphere, and a bright crimson edge overlay (same
+  // technique as the cube cluster's wireframe) outlines every facet so the
+  // two phases share a visual language instead of looking unrelated.
   var blobMat = new THREE.MeshPhysicalMaterial({
-    color: 0xf0ede8, metalness: 1, roughness: 0.16,
-    clearcoat: 0.2, clearcoatRoughness: 0.3, envMapIntensity: 1.3,
-    bumpMap: makeScaleTexture(), bumpScale: 0.018
+    color: 0xaa242a, metalness: 1, roughness: 0.24, flatShading: true,
+    clearcoat: 0.25, clearcoatRoughness: 0.3, envMapIntensity: 1.3
   });
   var blobMesh = new THREE.Mesh(blobGeo, blobMat);
+  var blobEdges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(blobGeo),
+    new THREE.LineBasicMaterial({ color: 0xff6b63, transparent: true, opacity: 0.55 })
+  );
+  blobMesh.add(blobEdges);
   scene.add(blobMesh);
 
   // ---------- cube cluster: the morph target ----------
@@ -766,8 +739,10 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
     var leaveEase = revealT; // 0..1 as the ring takes over
 
     // blob: open and large, settles smaller to fit the frame, then dissolves
-    // away as the cube-cluster takes its place
-    var blobScale = lerp(0.56, 0.38, boxInEase) * (1 - formEase);
+    // away as the cube-cluster takes its place. A slow sinusoidal "breathing"
+    // pulse rides on top of the scroll-driven scale for some idle life.
+    var breathe = reduce ? 1 : (1 + Math.sin(now * 0.0009) * 0.045);
+    var blobScale = lerp(0.56, 0.38, boxInEase) * (1 - formEase) * breathe;
     blobMesh.scale.setScalar(Math.max(0.0001, blobScale));
     blobMesh.position.y = lerp(0.35, 0, boxInEase);
     blobMat.opacity = 1; // opaque chrome, no fade needed — it shrinks to nothing instead
@@ -784,8 +759,8 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
     setGroupOpacity(cubeGroup, formEase * (1 - leaveEase));
 
     if (!reduce) {
-      blobMesh.rotation.y += 0.0035 * (1 - formEase * 0.5);
-      blobMesh.rotation.x += 0.0012;
+      blobMesh.rotation.y += 0.0011 * (1 - formEase * 0.5);
+      blobMesh.rotation.x += 0.0004;
       cubeGroup.rotation.y += 0.0022;
       cubeGroup.rotation.x += 0.0009;
     }
