@@ -163,6 +163,24 @@
   .frame-dot.fd-d { right: -3px; bottom: -28px; }
   .frame-dot.fd-d::after { top: auto; bottom: 50%; }
 
+  /* ---------- blob callout label ---------- */
+  .blob-label {
+    position: absolute;
+    left: 62%; top: 20%;
+    display: flex; flex-direction: column; align-items: center;
+    pointer-events: none; opacity: 0;
+  }
+  .blob-label-tag {
+    font-family: var(--display); font-weight: 500;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--dim); background: rgba(10, 11, 13, 0.72);
+    border: 1px solid var(--rule); padding: 5px 9px; white-space: nowrap;
+  }
+  .blob-label-leader {
+    width: 1px; height: 44px;
+    background: repeating-linear-gradient(to bottom, var(--faint) 0 3px, transparent 3px 7px);
+  }
+
   /* ---------- meta row ---------- */
   .meta-row {
     display: flex; justify-content: space-between;
@@ -291,6 +309,32 @@
     color: var(--faint); pointer-events: none;
   }
 
+  /* ---------- radar ping pulses ---------- */
+  /* Real 3D tilt via perspective()+rotateX(), not a faked ellipse — reads as
+     pulses expanding across a tilted radar dish instead of flat concentric
+     circles. Lives inside #ringLayer so it inherits that layer's existing
+     scroll-driven opacity/scale with zero extra JS. */
+  .radar-pulses { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+  .radar-pulse {
+    position: absolute; left: 0; top: 0;
+    width: 420px; height: 420px;
+    margin: -210px 0 0 -210px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    box-shadow: 0 0 14px rgba(229, 72, 77, 0.5);
+    transform: perspective(520px) rotateX(58deg) scale(0.15);
+    opacity: 0;
+    animation: radarPing 4s cubic-bezier(.25,.6,.4,1) infinite;
+  }
+  @keyframes radarPing {
+    0%   { transform: perspective(520px) rotateX(58deg) scale(0.15); opacity: 0.85; }
+    60%  { opacity: 0.18; }
+    100% { transform: perspective(520px) rotateX(58deg) scale(1); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .radar-pulse { animation: none; opacity: 0; }
+  }
+
   /* ---------- responsive ---------- */
   @media (max-width: 920px) {
     .layout { grid-template-columns: 1fr; }
@@ -416,6 +460,10 @@
             <span class="frame-dot fd-c"></span>
             <span class="frame-dot fd-d"></span>
           </div>
+          <div class="blob-label" id="blobLabel" aria-hidden="true">
+            <span class="blob-label-tag">RUNTIME CORE</span>
+            <span class="blob-label-leader"></span>
+          </div>
         </div>
 
         <div class="viz-layer" id="ringLayer">
@@ -439,6 +487,11 @@
             <circle class="node-core" cx="180" cy="180" r="3.5"/>
             <circle cx="180" cy="180" r="9" fill="none" stroke="#e5484d" stroke-width="1" opacity="0.5"/>
           </svg>
+          <div class="radar-pulses" aria-hidden="true">
+            <span class="radar-pulse" style="animation-delay: 0s"></span>
+            <span class="radar-pulse" style="animation-delay: 1.3s"></span>
+            <span class="radar-pulse" style="animation-delay: 2.6s"></span>
+          </div>
         </div>
 
         <div class="hud-top">VIPERNODE // RUNTIME</div>
@@ -679,6 +732,53 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
   blobMesh.add(blobEdges);
   scene.add(blobMesh);
 
+  // Drifting shard fragments — loose crimson chips orbiting the gem, each on
+  // its own radius/speed/phase/incline so they read as independent debris
+  // rather than a rigid ring. Children of blobMesh so they inherit its
+  // scroll-driven scale/position/opacity lifecycle for free.
+  var shardMat = new THREE.MeshPhysicalMaterial({
+    color: 0xc23b3f, metalness: 1, roughness: 0.3, flatShading: true, envMapIntensity: 1.1
+  });
+  var orbitShards = [];
+  for (var osi = 0; osi < 6; osi++) {
+    var shardSize = 0.07 + Math.random() * 0.07;
+    var shardMesh = new THREE.Mesh(new THREE.TetrahedronGeometry(shardSize, 0), shardMat);
+    blobMesh.add(shardMesh);
+    orbitShards.push({
+      el: shardMesh,
+      radius: 1.5 + Math.random() * 0.9,
+      speed: 0.00018 + Math.random() * 0.00022,
+      phase: Math.random() * Math.PI * 2,
+      incline: 0.25 + Math.random() * 0.5,
+      spin: 0.0006 + Math.random() * 0.0008
+    });
+  }
+
+  // Ground contact shadow — a soft radial-gradient disc beneath the gem so
+  // it doesn't read as floating in pure void. Not a child of blobMesh since
+  // that gets rotated on X/Y, which would tilt a shadow unnaturally.
+  function makeShadowTexture() {
+    var size = 256;
+    var cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    var ctx = cv.getContext('2d');
+    var grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+    grad.addColorStop(0.7, 'rgba(0,0,0,0.22)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(cv);
+  }
+  var shadowMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: makeShadowTexture(), transparent: true, depthWrite: false })
+  );
+  shadowMesh.rotation.x = -Math.PI / 2;
+  scene.add(shadowMesh);
+
+  var blobLabelEl = document.getElementById('blobLabel');
+
   // ---------- cube cluster: the morph target ----------
   // Small boxes at jittered offsets/rotations/sizes, not a clean grid — an
   // irregular, faceted "hardened crystal" cluster rather than a tidy cube.
@@ -774,6 +874,33 @@ import { RoomEnvironment } from '/vendor/three/RoomEnvironment.js';
     blobMesh.scale.setScalar(Math.max(0.0001, blobScale));
     blobMesh.position.y = lerp(0.35, 0, boxInEase);
     blobMat.opacity = 1; // opaque chrome, no fade needed — it shrinks to nothing instead
+
+    // orbiting shard fragments — each on its own radius/speed/phase, so they
+    // drift as independent debris rather than a rigid ring around the gem
+    if (!reduce) {
+      for (var osj = 0; osj < orbitShards.length; osj++) {
+        var sh = orbitShards[osj];
+        var ang = now * sh.speed + sh.phase;
+        sh.el.position.set(
+          Math.cos(ang) * sh.radius,
+          Math.sin(ang * 0.6) * sh.radius * sh.incline,
+          Math.sin(ang) * sh.radius
+        );
+        sh.el.rotation.x += sh.spin;
+        sh.el.rotation.y += sh.spin * 0.7;
+      }
+    }
+
+    // ground contact shadow — tracks the blob's current size/position so it
+    // doesn't read as floating in pure void
+    var approxR = 1.55 * blobScale;
+    shadowMesh.visible = blobScale > 0.002;
+    shadowMesh.scale.setScalar(Math.max(0.0001, approxR * 2.6));
+    shadowMesh.position.set(0, blobMesh.position.y - approxR * 0.95, 0.25);
+    shadowMesh.material.opacity = 0.5 * (1 - formEase) * (1 - leaveEase);
+
+    // callout label — fades in once the blob has settled, out as the cube forms
+    blobLabelEl.style.opacity = settleEase * (1 - formEase) * 0.9;
 
     // frame: fades in as the blob settles, fades back out once the ring takes over
     frameEl.style.opacity = boxInEase * (1 - leaveEase);
