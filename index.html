@@ -131,16 +131,17 @@
   .frame {
     position: absolute;
     left: 50%; top: 50%;
-    width: 340px; height: 340px;
+    width: 480px; height: 480px;
     transform: translate(-50%, -50%);
-    border: 1px solid var(--rule);
+    border: 1px solid var(--faint);
     pointer-events: none;
     opacity: 0;
   }
   .frame::before {
     content: '';
     position: absolute; inset: -12px;
-    border: 1px solid var(--rule-soft);
+    border: 1px solid var(--faint);
+    opacity: 0.55;
   }
   .frame-dot {
     position: absolute;
@@ -526,7 +527,8 @@
   // D_END (a fraction of the 0..1 morphT *within* that 0.70 window) marks
   // where the cube's long static hold ends and the ring starts revealing.
   var MORPH_END = 0.70;
-  var D_END = 0.97;   // 3D sequence fully resolved, right before the ring reveal
+  var D_END = 0.80;   // crossfade to the ring starts here — a wide gap to 1.0
+                       // so the cube-to-ring handoff is a gradual fade, not a snap
 
   function render(now) {
     cur += (target - cur) * 0.08;
